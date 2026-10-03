@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="{{ ui_lang or 'en' }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Simple Recipes">
+    <meta name="theme-color" content="#070a09">
+    <title>{% block title %}{{ t('app_name', ui_lang) }}{% endblock %} · Simple Recipes Plugin</title>
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=107">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v=107">
+    
+    <!-- Styles & Scripts -->
+    <link rel="stylesheet" href="/static/style_v103.css?v=107">
+    <link rel="stylesheet" href="/static/features.css?v=107">
+    <link rel="stylesheet" href="/static/provider.css?v=107">
+    <script>
+    window.recipeLayouts = {{ LANGUAGES | tojson }};
+    window.recipeT = (key, values = {}) => {
+        const strings = {{ ui_strings(ui_lang) | tojson }};
+        return (strings[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? ''));
+    };
+    </script>
+    <script src="/static/app_v103.js?v=111" defer></script>
+    <script src="/static/translation-check.js?v=111" defer></script>
+</head>
+<body>
+    <!-- Background glow elements -->
+    <div class="aurora"></div>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <div class="ambient ambient-three"></div>
+
+    <header>
+        <a href="/" class="brand">🍋 Simple Recipes</a>
+        <nav>
+            <a href="/" class="nav-link">{{ t('nav_recipes', ui_lang) }}</a>
+            <a href="/einstellungen" class="nav-link {{ 'active' if request.url.path == '/einstellungen' }}">⚙️ {{ t('nav_settings', ui_lang) }}</a>
+            <div class="lang-switch-header">
+                {% for code, name in LANGUAGES.items() %}
+                <a href="?lang={{ code }}" class="lang-chip {{ 'active' if ui_lang == code }}" title="{{ name }}">{{ code | upper }}</a>
+                {% endfor %}
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Overlay Spinner for processing -->
+    <div id="processing" class="processing" hidden>
+        <div class="processing-card">
+            <div class="spinner">
+                <span></span>
+            </div>
+            <p class="eyebrow">{{ t('processing_eyebrow', ui_lang) }}</p>
+            <h2>{{ t('processing_title', ui_lang) }}</h2>
+            <p>{{ t('processing_subtitle', ui_lang) }}</p>
+            <strong id="elapsed">00:00</strong>
+            <button id="cancel-processing" class="cancel-processing" type="button">{{ t('processing_cancel', ui_lang) }}</button>
+            <small>{{ t('processing_cancel_sub', ui_lang) }}</small>
+        </div>
+    </div>
+</body>
+</html>

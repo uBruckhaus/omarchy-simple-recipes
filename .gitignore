@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+data/
+*.db
+*.db-*
+certs/
+
+# Local development notes, never part of the public release
+REVIEW.md
+manual_draft.md

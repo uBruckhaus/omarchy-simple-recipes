@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c2420" />
+      <stop offset="100%" stop-color="#0b100e" />
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff906e" />
+      <stop offset="100%" stop-color="#94cf9a" />
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="40" fill="url(#bg)"/>
+  <rect x="3" y="3" width="174" height="174" rx="37" fill="none" stroke="url(#ring)" stroke-width="2" opacity="0.6"/>
+  <text x="90" y="98" font-size="92" dominant-baseline="central" text-anchor="middle">🍋</text>
+</svg>

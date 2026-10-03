@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}{{ r.title }} · {{ t('app_name', ui_lang) }}{% endblock %}
+
+{% block content %}
+<a class="back" href="/">{{ t('back_to_recipes', ui_lang) }}</a>
+
+{% if notice %}
+    <div class="notice">✓ {{ notice }}</div>
+{% endif %}
+
+{% if error %}
+    <div class="error">{{ error }}</div>
+{% endif %}
+
+<article class="recipe-article">
+    <div class="cover" {% if r.image_url %}style="background-image:url('{{ r.image_url }}')"{% endif %}></div>
+    
+    <div class="recipehead">
+        <span class="recipe-emoji">{{ r.emoji }}</span>
+        <div class="recipe-meta-header">
+            <p class="eyebrow">{{ r.source_type }}</p>
+            <h1>{{ r.title }}</h1>
+            <div class="facts">
+                <span class="fact-pill duration">
+                    <span class="fact-icon">⏱</span> {{ localize_duration(r.duration_class, ui_lang) }}{% if r.duration_minutes %} ({{ r.duration_minutes }} {{ t('min', ui_lang) }}){% endif %}
+                </span>
+                {% if r.servings %}
+                    <div class="servings-selector" id="servings-selector" data-original="{{ r.servings }}">
+                        <span class="fact-icon">🍽</span>
+                        <button type="button" class="servings-btn minus" id="servings-minus">−</button>
+                        <span class="servings-display" id="servings-display">{{ r.servings }}</span>
+                        <button type="button" class="servings-btn plus" id="servings-plus">＋</button>
+                    </div>
+                {% endif %}
+                {% if r.calories %}
+                    <span class="fact-pill calories">
+                        <span class="fact-icon">🔥</span> {{ r.calories }} {{ t('cal_per_serving', ui_lang) }}
+                    </span>
+                {% endif %}
+                <button type="button" class="fact-pill favorite-pill-btn {{ 'is-favorite' if r.favorite else '' }}" id="favorite-header-btn" data-id="{{ r.id }}">
+                    <span class="fact-icon heart-icon">{{ '♥' if r.favorite else '♡' }}</span> <span>{{ t('favorites', ui_lang) }}</span>
+                </button>
+                <form action="/recipe/{{ r.id }}/reprocess" method="post" style="display:inline-flex;" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='⏳ Processing...';">
+                    <button type="submit" class="fact-pill reprocess-pill-btn" title="{{ t('action_reprocess_ai', ui_lang) }} ({{ target_lang|upper }})">
+                        <span class="fact-icon">✨</span> <span>{{ t('action_reprocess_ai', ui_lang) }} [{{ target_lang|upper }}]</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <section class="category-chooser" data-category-view="chips">
+        <div class="category-heading">
+            <div>
+                <span class="category-caption">{{ t('category_label', ui_lang) }}</span>
+                <strong class="current-category">{{ category_icons.get(r.category, '🏷️') }} {{ localize_category(r.category, ui_lang) }}</strong>
+            </div>
+        </div>
+        
+        <div class="category-chips category-variant" data-variant="chips">
+            {% for cat in categories %}
+                <form action="/recipe/{{ r.id }}/category" method="post" class="category-chip-form">
+                    <input type="hidden" name="category" value="{{ cat }}">
+                    <button type="submit" class="chip-btn {{ 'active' if r.category == cat }}">
+                        {{ category_icons.get(cat, '🏷️') }} <span>{{ localize_category(cat, ui_lang) }}</span>
+                    </button>
+                </form>
+            {% endfor %}
+            <button class="category-add-chip" id="open-category-add" type="button">{{ t('category_new', ui_lang) }}</button>
+        </div>
+        
+        <form class="category-add-form" id="category-add-form" action="/categories" method="post" hidden>
+            <input type="hidden" name="next_url" value="/recipe/{{ r.id }}">
+            <input type="hidden" name="recipe_id" value="{{ r.id }}">
+            <label for="new-category-name">{{ t('new_category_name', ui_lang) }}</label>
+            <div class="category-add-row">
+                <input id="new-category-name" name="name" maxlength="80" placeholder="{{ t('category_example', ui_lang) }}" required autocomplete="off">
+                <button type="submit" class="btn-primary">{{ t('create_assign', ui_lang) }}</button>
+                <button type="button" id="cancel-category-add" class="btn-secondary">{{ t('processing_cancel', ui_lang) }}</button>
+            </div>
+        </form>
+    </section>
+
+    <div class="columns">
+        <section class="ingredients-section">
+            <div class="section-header">
+                <h2>{{ t('ingredients', ui_lang) }}</h2>
+                <button type="button" id="toggle-all-ingredients" class="select-all-btn">{{ t('select_all', ui_lang) }}</button>
+            </div>
+            <ul class="ingredients-list">
+                {% for x in r.ingredients_list %}
+                    <li>
+                        <label class="ingredient-checkbox-label">
+                            <input type="checkbox" checked>
+                            <span class="checkmark"></span>
+                            <span class="ingredient-text">{{ x }}</span>
+                        </label>
+                    </li>
+                {% else %}
+                    <li class="empty-list">{{ t('no_ingredients', ui_lang) }}</li>
+                {% endfor %}
+            </ul>
+        </section>
+        
+        <section class="instructions-section">
+            <h2>{{ t('instructions', ui_lang) }}</h2>
+            <ol class="instructions-timeline">
+                {% for x in r.instructions_list %}
+                    <li class="timeline-step">
+                        <div class="step-number">{{ loop.index }}</div>
+                        <div class="step-content">{{ x }}</div>
+                    </li>
+                {% else %}
+                    <li class="empty-list">{{ t('no_instructions', ui_lang) }}</li>
+                {% endfor %}
+            </ol>
+        </section>
+    </div>
+
+    <footer class="recipefooter">
+        <div class="actions">
+            <form action="/recipe/{{ r.id }}/tried" method="post" class="inline-form">
+                <button type="submit" class="tried-btn {{ 'is-tried' if r.tried else '' }}">
+                    {{ ('✓ ' ~ t('status_tried', ui_lang)) if r.tried else t('not_tried', ui_lang) }}
+                </button>
+            </form>
+            <button class="sms-action" id="start-cooking" type="button">{{ t('action_start_cooking', ui_lang) }}</button>
+            <button class="sms-action" id="open-sms" type="button">{{ t('action_share', ui_lang) }}</button>
+            {% if r.source_url %}
+                <a href="{{ r.source_url }}" target="_blank" class="source-action-btn">{{ t('open_original', ui_lang) }}</a>
+            {% endif %}
+            <form action="/recipe/{{ r.id }}/delete" method="post" onsubmit="return confirm('{{ t('action_delete_confirm', ui_lang) }}')" class="inline-form delete-form">
+                <button type="submit" class="delete-icon-btn" aria-label="{{ t('action_delete', ui_lang) }}">🗑️</button>
+            </form>
+        </div>
+    </footer>
+</article>
+
+<dialog class="sms-dialog" id="sms-dialog">
+    <form id="sms-form" data-whatsapp-message="{{ whatsapp_text }}" data-whatsapp-ingredients="{{ whatsapp_ingredients }}">
+        <button class="dialog-close" type="button" aria-label="Close">×</button>
+        <p class="eyebrow">{{ t('share_modal_title', ui_lang) | upper }}</p>
+        <h2>{{ t('share_modal_title', ui_lang) }}</h2>
+        
+        <fieldset class="share-choice">
+            <label>
+                <input type="radio" name="share_content" value="ingredients" checked>
+                <span>
+                    <strong>{{ t('share_ingredients', ui_lang) }}</strong>
+                    <small>{{ t('only_ingredients', ui_lang) }}</small>
+                </span>
+            </label>
+            <label>
+                <input type="radio" name="share_content" value="recipe">
+                <span>
+                    <strong>{{ t('share_all', ui_lang) }}</strong>
+                    <small>{{ t('ingredients_instructions', ui_lang) }}</small>
+                </span>
+            </label>
+        </fieldset>
+        
+        <p class="sms-info-text">{{ t('default_recipient', ui_lang) }}</p>
+        
+        <div class="profile-phone">
+            <span>{{ t('default_number', ui_lang) }}</span>
+            <strong>{{ phone_number if phone_number else (t('not_set', ui_lang)) }}</strong>
+        </div>
+        
+        <label class="sms-phone-label">
+            <span>{{ t('phone_label', ui_lang) }}</span>
+            <input id="sms-phone" name="phone" type="tel" autocomplete="tel" value="{{ phone_number }}" placeholder="e.g. +49 170 1234567" required>
+        </label>
+        
+        <div class="dialog-actions">
+            <button type="button" class="dialog-cancel">{{ t('processing_cancel', ui_lang) }}</button>
+            <button type="button" class="print-action" onclick="document.getElementById('sms-dialog').close(); window.print();">🖨️ {{ t('print_recipe', ui_lang) }}</button>
+            <button type="submit" class="whatsapp-action">{{ t('open_whatsapp', ui_lang) }}</button>
+        </div>
+    </form>
+</dialog>
+
+<div class="cooking-overlay" id="cooking-overlay" data-steps='{{ r.instructions_list|tojson|safe }}'>
+    <div class="cooking-header">
+        <div class="cooking-meta">
+            <span class="cooking-recipe-title">{{ r.title }}</span>
+            <span class="cooking-step-badge" id="cooking-step-badge">{{ t('cooking_step', ui_lang) }} 1 {{ t('cooking_of', ui_lang) }} 1</span>
+        </div>
+        <button class="cooking-close" id="close-cooking" type="button" aria-label="{{ t('cooking_close', ui_lang) }}">✕</button>
+    </div>
+    
+    <div class="cooking-progress-container">
+        <div class="cooking-progress-bar" id="cooking-progress-bar"></div>
+    </div>
+
+    <div class="cooking-body">
+        <div class="cooking-card">
+            <div class="cooking-step-num" id="cooking-step-num">1</div>
+            <div class="cooking-step-text" id="cooking-step-text">Step text...</div>
+        </div>
+    </div>
+
+    <div class="cooking-footer">
+        <button class="cooking-btn prev" id="cooking-prev" type="button">◀ {{ t('cooking_prev', ui_lang) }}</button>
+        <button class="cooking-btn next" id="cooking-next" type="button">{{ t('cooking_next', ui_lang) }} ▶</button>
+    </div>
+</div>
+{% endblock %}

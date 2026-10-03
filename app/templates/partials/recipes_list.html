@@ -1,0 +1,79 @@
+{% if grouped_recipes %}
+    {% for cat_name, cat_icon, cat_recipes in grouped_recipes %}
+        <div class="category-group">
+            <h3 class="category-group-title">
+                <span class="group-icon">{{ cat_icon }}</span> 
+                <span class="group-name">{{ localize_category(cat_name, ui_lang) }}</span>
+                <span class="group-count">({{ cat_recipes|length }})</span>
+            </h3>
+            <section class="grid">
+                {% for r in cat_recipes %}
+                    <a class="card" href="/recipe/{{ r.id }}" style="view-transition-name: recipe-card-{{ r.id }};">
+                        <div class="photo" {% if r.image_url %}style="background-image:url('{{ r.image_url }}')"{% endif %}>
+                            <span class="card-emoji">{{ r.emoji }}</span>
+                            <b class="card-duration">{{ localize_duration(r.duration_class, ui_lang) }}{% if r.duration_minutes %} · {{ r.duration_minutes }} {{ t('min', ui_lang) }}{% endif %}</b>
+                            <button class="favorite-btn {{ 'is-favorite' if r.favorite else '' }}" data-id="{{ r.id }}" aria-label="Favorite" type="button">
+                                <span class="heart-icon">{{ '♥' if r.favorite else '♡' }}</span>
+                            </button>
+                        </div>
+                        <div class="cardbody">
+                            <div class="card-meta">
+                                <small class="category-label">{{ category_icons.get(r.category, '🏷️') }} {{ localize_category(r.category, ui_lang) }}</small>
+                            </div>
+                            <h3>{{ r.title }}</h3>
+                            <p class="tag-container">
+                                {% for tag in r.tags_list[:3] %}
+                                    <i class="tag-pill">{{ tag }}</i>
+                                {% endfor %}
+                            </p>
+                            <div class="card-footer-info">
+                                {% if r.tried %}
+                                    <span class="status-badge tried"><span class="dot"></span> {{ t('status_tried', ui_lang) }}</span>
+                                {% else %}
+                                    <span class="status-badge untried"><span class="dot"></span> {{ t('status_untried', ui_lang) }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                {% endfor %}
+            </section>
+        </div>
+    {% endfor %}
+{% elif recipes %}
+    <section class="grid">
+        {% for r in recipes %}
+            <a class="card" href="/recipe/{{ r.id }}" style="view-transition-name: recipe-card-{{ r.id }};">
+                <div class="photo" {% if r.image_url %}style="background-image:url('{{ r.image_url }}')"{% endif %}>
+                    <span class="card-emoji">{{ r.emoji }}</span>
+                    <b class="card-duration">{{ localize_duration(r.duration_class, ui_lang) }}{% if r.duration_minutes %} · {{ r.duration_minutes }} {{ t('min', ui_lang) }}{% endif %}</b>
+                    <button class="favorite-btn {{ 'is-favorite' if r.favorite else '' }}" data-id="{{ r.id }}" aria-label="Favorite" type="button">
+                        <span class="heart-icon">{{ '♥' if r.favorite else '♡' }}</span>
+                    </button>
+                </div>
+                <div class="cardbody">
+                    <div class="card-meta">
+                        <small class="category-label">{{ category_icons.get(r.category, '🏷️') }} {{ localize_category(r.category, ui_lang) }}</small>
+                    </div>
+                    <h3>{{ r.title }}</h3>
+                    <p class="tag-container">
+                        {% for tag in r.tags_list[:3] %}
+                            <i class="tag-pill">{{ tag }}</i>
+                        {% endfor %}
+                    </p>
+                    <div class="card-footer-info">
+                        {% if r.tried %}
+                            <span class="status-badge tried"><span class="dot"></span> {{ t('status_tried', ui_lang) }}</span>
+                        {% else %}
+                            <span class="status-badge untried"><span class="dot"></span> {{ t('status_untried', ui_lang) }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </a>
+        {% endfor %}
+    </section>
+{% else %}
+    <div class="empty">
+        <strong>{{ t('no_recipes_title', ui_lang) }}</strong>
+        <p>{{ t('no_recipes_sub', ui_lang) }}</p>
+    </div>
+{% endif %}

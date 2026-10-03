@@ -1,0 +1,1007 @@
+/* Modern Dark Redesign - Special Features, Effects & Animations */
+
+/* Background Noise overlay for premium paper texture */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.15;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.2'/%3E%3C/svg%3E");
+    z-index: 1000;
+}
+
+/* Ambient glow blobs */
+.ambient {
+    position: fixed;
+    width: 450px;
+    height: 450px;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.12;
+    pointer-events: none;
+    z-index: -1;
+    animation: drift 15s ease-in-out infinite alternate;
+}
+
+.ambient-one {
+    background: var(--orange);
+    right: -150px;
+    top: 10%;
+}
+
+.ambient-two {
+    background: var(--sage);
+    left: -200px;
+    bottom: -50px;
+    animation-delay: -5s;
+}
+
+/* Import Box / Dropzone styling */
+.import {
+    position: relative;
+    border: 1px solid var(--border-color);
+    transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+    animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.import:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.dropzone.drag-active {
+    transform: scale(1.02);
+    border-color: var(--orange);
+    box-shadow: 0 0 0 4px var(--orange-glow), 0 25px 60px rgba(0, 0, 0, 0.4);
+}
+
+.drop-icon {
+    position: absolute;
+    right: 28px;
+    top: 24px;
+    font-size: 24px;
+    color: var(--orange);
+    transition: var(--transition-fast);
+}
+
+.drag-active .drop-icon {
+    transform: translateY(6px) scale(1.2);
+    color: #fff;
+}
+
+/* Dropdown styling updates */
+.import select,
+.toolbar select,
+.category-tools select {
+    background: var(--bg-dark);
+    color: var(--text-bright);
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: 8px;
+    outline: none;
+    font-family: var(--font-family);
+    transition: var(--transition-fast);
+}
+
+.import select:focus,
+.toolbar select:focus,
+.category-tools select:focus {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-glow);
+}
+
+/* Card Animation & Entrance */
+.card {
+    animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.card:nth-child(2) { animation-delay: 0.05s; }
+.card:nth-child(3) { animation-delay: 0.1s; }
+.card:nth-child(4) { animation-delay: 0.15s; }
+.card:nth-child(5) { animation-delay: 0.2s; }
+.card:nth-child(6) { animation-delay: 0.25s; }
+
+/* Processing overlay styling */
+.processing {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: rgba(7, 10, 9, 0.92);
+    backdrop-filter: blur(15px);
+    display: grid;
+    place-items: center;
+    animation: fadeIn 0.25s ease;
+}
+
+.processing[hidden] {
+    display: none !important;
+}
+
+.processing-card {
+    text-align: center;
+    background: #0f1412;
+    border: 1px solid var(--border-color);
+    padding: 48px;
+    border-radius: 28px;
+    box-shadow: 0 30px 100px rgba(0, 0, 0, 0.7);
+    max-width: 460px;
+    width: 90%;
+    animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.processing-card h2 {
+    font-size: 28px;
+    font-weight: 800;
+    margin: 10px 0;
+    letter-spacing: -0.01em;
+}
+
+.processing-card p:not(.eyebrow) {
+    color: var(--text-muted);
+    font-size: 15px;
+    margin: 8px 0;
+}
+
+.processing-card strong {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 40px;
+    color: #fff;
+    margin: 24px 0;
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.processing-card small {
+    display: block;
+    color: var(--text-muted);
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+/* Spinner design */
+.spinner {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    border: 3px solid rgba(255, 255, 255, 0.06);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    position: relative;
+    animation: spin 2s linear infinite;
+}
+
+.spinner span {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 0 15px var(--orange);
+    top: -7px;
+}
+
+/* Keyframes animations */
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes cardIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes drift {
+    0% {
+        transform: translate(0, 0) scale(1);
+    }
+    100% {
+        transform: translate(60px, 40px) scale(1.15);
+    }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+        animation-delay: -1ms !important;
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        background-attachment: initial !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+    }
+}
+
+/* Import Tabs */
+.import-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: var(--transition-fast);
+    font-family: var(--font-family);
+}
+
+.tab-btn:hover {
+    color: var(--text-bright);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+    color: var(--orange);
+    background: var(--orange-glow);
+    box-shadow: inset 0 0 0 1px rgba(255, 107, 43, 0.2);
+}
+
+/* Tab Content Visibility */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Video Results Styling */
+.video-results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 20px;
+    max-height: 380px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+/* Custom Scrollbar for results */
+.video-results-list::-webkit-scrollbar {
+    width: 6px;
+}
+.video-results-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 3px;
+}
+.video-results-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+.video-results-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.video-result-card {
+    display: flex;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 10px;
+    align-items: center;
+    transition: var(--transition-fast);
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+}
+
+.video-result-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.video-result-card:active {
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(0.99);
+}
+
+.video-thumb-wrapper {
+    position: relative;
+    width: 100px;
+    height: 56px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: #000;
+}
+
+.video-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-duration {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.video-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.video-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+}
+
+.video-channel {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.video-import-btn {
+    border: 0;
+    background: var(--orange);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    flex-shrink: 0;
+    font-family: var(--font-family);
+}
+
+.video-import-btn:hover {
+    background: var(--orange-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px var(--orange-glow);
+}
+
+/* Spinner inside video results */
+.video-search-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 10px;
+    color: var(--text-muted);
+    font-size: 14px;
+    gap: 12px;
+}
+
+.video-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255, 255, 255, 0.06);
+    border-radius: 50%;
+    border-top-color: var(--orange);
+    animation: spin 1s linear infinite;
+}
+
+.video-no-results {
+    text-align: center;
+    padding: 30px 10px;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* ==============================================================================
+   iPhone & Mobile UX Optimizations (iOS / iPadOS)
+   ============================================================================== */
+
+/* 1. Global iOS touch & scroll enhancements */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 2. Prevent iOS Safari automatic zoom on form input focus */
+@media screen and (max-width: 768px) {
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* 3. Safe-Area insets (Notch, Dynamic Island, Home Indicator) */
+header {
+    min-height: 60px;
+    padding-top: max(env(safe-area-inset-top), 10px) !important;
+    padding-left: max(env(safe-area-inset-left), 16px) !important;
+    padding-right: max(env(safe-area-inset-right), 16px) !important;
+}
+
+main {
+    padding-left: max(env(safe-area-inset-left), 16px) !important;
+    padding-right: max(env(safe-area-inset-right), 16px) !important;
+    padding-bottom: max(env(safe-area-inset-bottom), 30px) !important;
+}
+
+/* 4. iPhone Screen Adjustments (< 640px) */
+@media (max-width: 640px) {
+    /* Header & Branding */
+    header {
+        height: auto;
+    }
+
+    .brand {
+        font-size: 19px;
+        gap: 6px;
+    }
+
+    .nav-link {
+        padding: 8px 12px;
+        font-size: 13px;
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    /* Hero */
+    .hero {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+        padding: 10px 0 25px !important;
+    }
+
+    .hero-text h1 {
+        font-size: clamp(26px, 7.5vw, 34px) !important;
+        margin: 6px 0 12px !important;
+        line-height: 1.15;
+    }
+
+    .hero-text p {
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+
+    /* Import Box */
+    .import {
+        padding: 20px 16px !important;
+        border-radius: 20px !important;
+    }
+
+    .import-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .tab-btn {
+        flex: 1;
+        min-height: 44px;
+        padding: 10px;
+        font-size: 14px;
+        text-align: center;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .urlrow {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+
+    .urlrow input {
+        width: 100% !important;
+        height: 48px !important;
+        font-size: 16px !important;
+        border-radius: 12px !important;
+        padding: 0 14px !important;
+    }
+
+    .urlrow button {
+        width: 100% !important;
+        height: 48px !important;
+        border-radius: 12px !important;
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        justify-content: center !important;
+    }
+
+    .ai-config {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    .ai-config label select,
+    .ai-config label input {
+        width: 100% !important;
+        height: 46px !important;
+        font-size: 16px !important;
+        border-radius: 10px;
+    }
+
+    /* Toolbar & Filters */
+    .toolbar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 14px !important;
+        margin-bottom: 20px !important;
+    }
+
+    .toolbar h2 {
+        font-size: 20px !important;
+        margin: 0 !important;
+    }
+
+    .filters {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        width: 100% !important;
+    }
+
+    .search-wrapper {
+        width: 100% !important;
+    }
+
+    .search-wrapper input {
+        width: 100% !important;
+        height: 46px !important;
+        font-size: 16px !important;
+        border-radius: 12px !important;
+        padding-left: 14px !important;
+    }
+
+    .view-switcher {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .view-chip,
+    .favorites-chip {
+        flex: 1;
+        min-height: 44px !important;
+        padding: 10px 14px !important;
+        font-size: 14px !important;
+        border-radius: 12px !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    select[name="sort"] {
+        width: 100% !important;
+        height: 46px !important;
+        font-size: 16px !important;
+        border-radius: 12px !important;
+    }
+
+    /* Category Nav bar */
+    .category-nav {
+        padding: 6px 0 18px !important;
+        gap: 8px !important;
+        scrollbar-width: none !important;
+    }
+
+    .category-nav::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .category-nav a {
+        padding: 10px 16px !important;
+        font-size: 13.5px !important;
+        min-height: 42px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+    }
+
+    /* Recipe Cards Grid */
+    .grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    .card {
+        border-radius: 20px !important;
+    }
+
+    .card-cover {
+        height: 190px !important;
+    }
+
+    .card-body {
+        padding: 18px 16px !important;
+    }
+
+    .card-title {
+        font-size: 18px !important;
+    }
+
+    .favorite-btn {
+        width: 44px !important;
+        height: 44px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Recipe Detail Page */
+    .back {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        font-size: 15px;
+        font-weight: 600;
+        padding: 6px 4px;
+        margin-bottom: 12px;
+    }
+
+    .recipe-article {
+        border-radius: 20px !important;
+    }
+
+    .cover {
+        height: 220px !important;
+        border-radius: 18px 18px 0 0 !important;
+    }
+
+    .recipehead {
+        padding: 20px 16px !important;
+        gap: 14px !important;
+    }
+
+    .recipe-emoji {
+        font-size: 40px !important;
+    }
+
+    .recipehead h1 {
+        font-size: clamp(22px, 6.5vw, 30px) !important;
+        margin: 6px 0 12px !important;
+    }
+
+    .facts {
+        gap: 8px !important;
+        flex-wrap: wrap !important;
+    }
+
+    .fact-pill {
+        padding: 8px 14px !important;
+        font-size: 13.5px !important;
+        min-height: 40px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+    }
+
+    .servings-selector {
+        min-height: 40px !important;
+        padding: 4px 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+    }
+
+    .servings-btn {
+        width: 38px !important;
+        height: 38px !important;
+        font-size: 18px !important;
+        border-radius: 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .servings-display {
+        min-width: 26px !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Category chips in detail view */
+    .category-chooser {
+        margin: 12px 14px 20px !important;
+        padding: 14px !important;
+        border-radius: 16px !important;
+    }
+
+    .category-chips {
+        display: flex !important;
+        overflow-x: auto !important;
+        gap: 8px !important;
+        padding-bottom: 6px !important;
+        scrollbar-width: none !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    .category-chips::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .chip-btn, .category-add-chip {
+        flex: none !important;
+        min-height: 42px !important;
+        padding: 8px 16px !important;
+        font-size: 13.5px !important;
+    }
+
+    /* Ingredients & Instructions columns */
+    .columns {
+        padding: 16px !important;
+        gap: 28px !important;
+    }
+
+    .section-header {
+        margin-bottom: 14px;
+    }
+
+    .select-all-btn {
+        min-height: 38px;
+        padding: 8px 14px;
+        font-size: 13px;
+        border-radius: 10px;
+    }
+
+    /* Ingredient touch card */
+    .ingredient-checkbox-label {
+        min-height: 48px !important;
+        padding: 12px 14px !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-radius: 12px !important;
+        margin-bottom: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        transition: background 0.15s ease, border-color 0.15s ease !important;
+    }
+
+    .ingredient-checkbox-label:active {
+        background: rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .checkmark {
+        width: 22px !important;
+        height: 22px !important;
+        border-radius: 7px !important;
+        margin-top: 0 !important;
+    }
+
+    .ingredient-text {
+        font-size: 15px !important;
+        line-height: 1.4 !important;
+    }
+
+    /* Instructions Timeline */
+    .timeline-step {
+        padding-left: 48px !important;
+        margin-bottom: 24px !important;
+    }
+
+    .step-number {
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 14px !important;
+    }
+
+    .step-content {
+        font-size: 15.5px !important;
+        line-height: 1.65 !important;
+    }
+
+    /* Recipe Footer Actions */
+    .recipefooter {
+        padding: 18px 16px max(env(safe-area-inset-bottom), 18px) !important;
+    }
+
+    .recipefooter .actions {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        width: 100% !important;
+    }
+
+    #start-cooking {
+        width: 100% !important;
+        height: 52px !important;
+        font-size: 16px !important;
+        font-weight: 800 !important;
+        border-radius: 14px !important;
+        background: linear-gradient(135deg, var(--orange), #ff906e) !important;
+        color: #fff !important;
+        box-shadow: 0 4px 15px var(--orange-glow) !important;
+        order: 1 !important;
+    }
+
+    .tried-btn {
+        width: 100% !important;
+        height: 48px !important;
+        border-radius: 12px !important;
+        font-size: 14.5px !important;
+        order: 2 !important;
+    }
+
+    #open-sms {
+        width: 100% !important;
+        height: 48px !important;
+        border-radius: 12px !important;
+        font-size: 14.5px !important;
+        order: 3 !important;
+    }
+
+    .source-action-btn {
+        width: 100% !important;
+        height: 46px !important;
+        border-radius: 12px !important;
+        font-size: 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        order: 4 !important;
+    }
+
+    .delete-form {
+        width: 100% !important;
+        order: 5 !important;
+        margin: 6px 0 0 !important;
+    }
+
+    .delete-icon-btn {
+        width: 100% !important;
+        height: 44px !important;
+        border-radius: 12px !important;
+        font-size: 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Cooking Mode on iPhone */
+    .cooking-header {
+        padding: max(env(safe-area-inset-top), 16px) 16px 12px !important;
+    }
+
+    .cooking-recipe-title {
+        font-size: 14px !important;
+        max-width: 65vw !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .cooking-close {
+        width: 44px !important;
+        height: 44px !important;
+        font-size: 20px !important;
+        border-radius: 12px !important;
+    }
+
+    .cooking-body {
+        padding: 16px !important;
+    }
+
+    .cooking-card {
+        padding: 24px 18px !important;
+        border-radius: 20px !important;
+    }
+
+    .cooking-step-num {
+        font-size: 26px !important;
+        margin-bottom: 12px !important;
+    }
+
+    .cooking-step-text {
+        font-size: clamp(19px, 5.5vw, 24px) !important;
+        line-height: 1.5 !important;
+        font-weight: 600 !important;
+    }
+
+    .cooking-footer {
+        padding: 12px 16px max(env(safe-area-inset-bottom), 16px) !important;
+        gap: 10px !important;
+    }
+
+    .cooking-btn {
+        flex: 1 !important;
+        min-width: 0 !important;
+        height: 52px !important;
+        font-size: 16px !important;
+        border-radius: 14px !important;
+    }
+
+    /* Dialog Bottom Sheet on iPhone */
+    .sms-dialog {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: auto 0 0 !important;
+        border-radius: 24px 24px 0 0 !important;
+        border-bottom: 0 !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+    }
+
+    .sms-dialog > form {
+        padding: 24px 18px max(env(safe-area-inset-bottom), 24px) !important;
+    }
+
+    .dialog-actions {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+
+    .dialog-actions button {
+        width: 100% !important;
+        height: 48px !important;
+        border-radius: 12px !important;
+        font-size: 15px !important;
+    }
+}
+
+.reprocess-pill-btn {
+    cursor: pointer;
+    background: rgba(148, 207, 154, 0.12) !important;
+    border-color: rgba(148, 207, 154, 0.35) !important;
+    color: var(--sage) !important;
+    transition: var(--transition-fast);
+}
+
+.reprocess-pill-btn:hover {
+    background: rgba(148, 207, 154, 0.25) !important;
+    border-color: var(--sage) !important;
+}
+
+.reprocess-pill-btn:active {
+    transform: scale(0.96);
+}
+
+

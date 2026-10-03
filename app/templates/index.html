@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-text">
+        <p class="eyebrow">{{ t('hero_eyebrow', ui_lang) }}</p>
+        <h1>{{ t('hero_title', ui_lang) | safe }}</h1>
+        <p>{{ t('hero_subtitle', ui_lang) }}</p>
+    </div>
+
+    <div class="import dropzone" id="import-container">
+        <div class="drop-icon">↘</div>
+
+        <div class="import-tabs">
+            <button type="button" class="tab-btn active" data-tab="tab-import-url">{{ t('tab_import_url', ui_lang) }}</button>
+            <button type="button" class="tab-btn" data-tab="tab-video-search">{{ t('tab_video_search', ui_lang) }}</button>
+        </div>
+
+        <form id="import-form" action="/import" method="post" autocomplete="off">
+            <div id="tab-import-url" class="tab-content active">
+                <label for="recipe-url" class="import-label">{{ t('import_label', ui_lang) }}</label>
+                <p class="import-sub">{{ t('import_sub', ui_lang) }}</p>
+                
+                <div class="urlrow">
+                    <input id="recipe-url" name="url" type="url" autocomplete="off" placeholder="{{ t('import_placeholder', ui_lang) }}" required>
+                    <button type="submit">{{ t('import_btn', ui_lang) }} <span>→</span></button>
+                </div>
+            </div>
+
+            <div class="ai-config-section">
+                <div class="ai-config">
+                    <label>{{ t('provider_label', ui_lang) }}
+                        <select id="provider" name="provider" autocomplete="off">
+                            <optgroup label="Local">
+                                <option value="llamacpp" {{ 'selected' if saved_provider == 'llamacpp' or (not saved_provider and lcpp.online and not lm.online) }}>llama.cpp (Local ROCm)</option>
+                                <option value="lmstudio" {{ 'selected' if saved_provider == 'lmstudio' or (not saved_provider and not lcpp.online) }}>LM Studio (Local)</option>
+                                <option value="ollama" {{ 'selected' if saved_provider == 'ollama' }}>Ollama (Local)</option>
+                            </optgroup>
+                            <optgroup label="Online (API Key)">
+                                <option value="codex" {{ 'selected' if saved_provider == 'codex' }}>Codex — existing ChatGPT login</option>
+                        <option value="gemini" {{ 'selected' if saved_provider == 'gemini' }}>Google Gemini</option>
+                                <option value="openai" {{ 'selected' if saved_provider == 'openai' }}>OpenAI API (separate API key)</option>
+                                <option value="groq" {{ 'selected' if saved_provider == 'groq' }}>Groq (High-Speed)</option>
+                                <option value="openrouter" {{ 'selected' if saved_provider == 'openrouter' }}>OpenRouter</option>
+                                <option value="deepseek" {{ 'selected' if saved_provider == 'deepseek' }}>DeepSeek</option>
+                                <option value="mistral" {{ 'selected' if saved_provider == 'mistral' }}>Mistral AI</option>
+                            </optgroup>
+                            <optgroup label="Custom">
+                                <option value="custom" {{ 'selected' if saved_provider == 'custom' }}>OpenAI-compatible</option>
+                            </optgroup>
+                        </select>
+                    </label>
+                    
+                    <label class="lm-model-field">{{ t('model_label', ui_lang) }}
+                        <select name="llm_model" id="llm-model">
+                            {% for llm_name in lm.models %}
+                                <option value="{{ llm_name }}" data-provider="lmstudio" data-active="{{ 'true' if llm_name == lm.active else 'false' }}" {{ 'selected' if (saved_provider == 'lmstudio' and saved_model == llm_name) or (not saved_model and llm_name == lm.active) }}>
+                                    {{ llm_name }}{{ ' · ' ~ t('model_active', ui_lang) if llm_name == lm.active }}
+                                </option>
+                            {% endfor %}
+                            {% for lcpp_name in lcpp.models %}
+                                <option value="{{ lcpp_name }}" data-provider="llamacpp" data-active="{{ 'true' if lcpp_name == lcpp.active else 'false' }}" {{ 'selected' if (saved_provider == 'llamacpp' and saved_model == lcpp_name) or (not saved_model and lcpp_name == lcpp.active and not lm.online) }}>
+                                    {{ lcpp_name }}{{ ' · ' ~ t('model_active', ui_lang) if lcpp_name == lcpp.active }}
+                                </option>
+                            {% endfor %}
+                            {% for p_key, p_cfg in providers_config.items() %}
+                                {% if p_cfg.type == 'online' %}
+                                    {% for m_name in p_cfg.models %}
+                                        <option value="{{ m_name }}" data-provider="{{ p_key }}" {{ 'selected' if saved_provider == p_key and (saved_model == m_name or (not saved_model and m_name == p_cfg.default_model)) }}>
+                                            {{ m_name }}
+                                        </option>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </label>
+
+                    <label class="target-lang-field">{{ t('target_lang_label', ui_lang) }}
+                        <select name="target_lang" id="target-lang" autocomplete="off">
+                    {% for code, name in target_languages.items() %}
+                    <option value="{{ code }}" {{ 'selected' if target_lang == code }}>{{ name }}</option>
+                    {% endfor %}
+                        </select>
+                    </label>
+                    
+                    <label class="other-model-field" hidden>{{ t('model_name_label', ui_lang) }}
+                        <input name="custom_model" autocomplete="off" data-1p-ignore="true" placeholder="{{ t('custom_model_placeholder', ui_lang) }}">
+                    </label>
+                    
+                    <label class="custom-field" hidden>{{ t('server_url_label', ui_lang) }}
+                        <input name="custom_url" type="url" autocomplete="off" placeholder="https://server.example/v1">
+                    </label>
+                    
+                    <label class="custom-field" hidden>{{ t('api_key_label', ui_lang) }}
+                        <input name="provider_token" type="password" autocomplete="new-password" data-1p-ignore="true" data-lpignore="true" placeholder="optional">
+                    </label>
+                </div>
+
+                <label class="check">
+                    <input type="checkbox" name="use_ai" value="true" {% if ai_online %}checked{% endif %}>
+                    <span>{{ t('use_ai_label', ui_lang) }}</span>
+                </label>
+                
+                <small class="status {{ 'on' if ai_online else '' }}">
+                    {% if codex_ready %}
+                        ● Codex · ChatGPT
+                    {% elif is_online and saved_key %}
+                        ● {{ providers_config[saved_provider].name }} {{ t('active_online', ui_lang) }}
+                    {% else %}
+                        {{ '● llama.cpp ' ~ t('connected', ui_lang) ~ ' · ' ~ lcpp.active if lcpp.online else '○ llama.cpp ' ~ t('offline', ui_lang) }}
+                        &nbsp;·&nbsp;
+                        {{ '● LM Studio ' ~ t('connected', ui_lang) ~ ' · ' ~ lm.active if lm.online else '○ LM Studio ' ~ t('offline', ui_lang) }}
+                    {% endif %}
+                    {% if not ai_online %} {{ t('import_without_ai_notice', ui_lang) }}{% endif %}
+                </small>
+            </div>
+        </form>
+
+        <div id="tab-video-search" class="tab-content">
+            <label for="video-search-query" class="import-label">{{ t('video_label', ui_lang) }}</label>
+            <p class="import-sub">{{ t('video_sub', ui_lang) }}</p>
+            
+            <div class="urlrow">
+                <input id="video-search-query" type="text" autocomplete="off" placeholder="{{ t('video_placeholder', ui_lang) }}">
+                <button type="button" id="video-search-btn">{{ t('video_search_btn', ui_lang) }} <span>🔍</span></button>
+            </div>
+
+            <div id="video-search-results" class="video-results-list"></div>
+        </div>
+    </div>
+</section>
+
+{% if error %}
+    <div class="error">{{ error }}</div>
+{% endif %}
+
+{% if notice %}
+    <div class="notice">✓ {{ notice }}</div>
+{% endif %}
+
+<section class="toolbar">
+    <h2>{{ recipes|length }} {{ t('recipes_count', ui_lang) }}</h2>
+    <form class="filters">
+        <input type="hidden" name="category" value="{{ category }}">
+
+        {% if not category %}
+        <div class="view-switcher">
+            <input type="hidden" name="view" id="view-input" value="{{ view }}">
+            <button type="button" class="view-chip {{ 'active' if view == 'flat' or not view }}" data-value="flat">
+                🔲 {{ t('view_flat', ui_lang) }}
+            </button>
+            <button type="button" class="view-chip {{ 'active' if view == 'grouped' }}" data-value="grouped">
+                🏷️ {{ t('view_grouped', ui_lang) }}
+            </button>
+        </div>
+        {% else %}
+        <input type="hidden" name="view" value="{{ view }}">
+        {% endif %}
+
+        <input type="hidden" name="favorites" id="favorites-input" value="{{ '1' if favorites else '' }}">
+        <button type="button" class="favorites-chip {{ 'active' if favorites }}" id="favorites-toggle-btn">
+            ❤️ {{ t('favorites', ui_lang) }}
+        </button>
+
+        <div class="search-wrapper">
+            <input id="search-input" name="q" value="{{ q }}" placeholder="{{ t('search_placeholder', ui_lang) }}" autocomplete="off">
+            <div class="search-suggestions" id="search-suggestions" hidden></div>
+        </div>
+        
+        <select name="sort" aria-label="Sort">
+            <option value="newest" {{ 'selected' if sort == 'newest' }}>{{ t('sort_newest', ui_lang) }}</option>
+            <option value="oldest" {{ 'selected' if sort == 'oldest' }}>{{ t('sort_oldest', ui_lang) }}</option>
+            <option value="title" {{ 'selected' if sort == 'title' }}>{{ t('sort_title', ui_lang) }}</option>
+            <option value="duration" {{ 'selected' if sort == 'duration' }}>{{ t('sort_duration', ui_lang) }}</option>
+            <option value="calories" {{ 'selected' if sort == 'calories' }}>{{ t('sort_calories', ui_lang) }}</option>
+            <option value="tried" {{ 'selected' if sort == 'tried' }}>{{ t('sort_tried', ui_lang) }}</option>
+        </select>
+    </form>
+</section>
+
+<nav class="category-nav" aria-label="Categories">
+    <a class="{{ 'active' if not category }}" href="/?sort={{ sort }}&q={{ q|urlencode }}&view={{ view }}">🍽️ {{ t('all_recipes', ui_lang) }}</a>
+    {% for cat in categories %}
+        <a class="{{ 'active' if category == cat }}" href="/?category={{ cat|urlencode }}&sort={{ sort }}&q={{ q|urlencode }}&view={{ view }}">
+            {{ category_icons.get(cat, '🏷️') }} {{ localize_category(cat, ui_lang) }}
+        </a>
+    {% endfor %}
+</nav>
+
+<details class="category-manager">
+    <summary>{{ t('manage_categories', ui_lang) }}</summary>
+    <div class="category-tools">
+        <form action="/categories" method="post" class="category-add-form-inline">
+            <input name="name" placeholder="{{ t('new_category', ui_lang) }}" maxlength="80" required autocomplete="off">
+            <button type="submit">{{ t('add', ui_lang) }}</button>
+        </form>
+        <div class="category-list-edit">
+            {% for cat in categories %}
+                <div class="category-row">
+                    <form action="/categories/rename" method="post" class="category-rename-form">
+                        <input type="hidden" name="old_name" value="{{ cat }}">
+                        <input name="new_name" value="{{ cat }}" maxlength="80" required autocomplete="off">
+                        <button type="submit">{{ t('rename', ui_lang) }}</button>
+                    </form>
+                    {% if cat != 'Sonstiges' %}
+                        <form action="/categories/delete" method="post" onsubmit="return confirm('Delete category „{{ cat }}“?')" class="category-delete-form">
+                            <input type="hidden" name="name" value="{{ cat }}">
+                            <button type="submit" class="danger">{{ t('delete', ui_lang) }}</button>
+                        </form>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</details>
+
+<div id="recipes-container">
+    {% include "partials/recipes_list.html" %}
+</div>
+{% endblock %}

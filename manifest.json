@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "ubruckhaus.simple-recipes",
+  "name": "Simple Recipes",
+  "version": "0.7.2",
+  "author": "uBruckhaus",
+  "description": "Your recipe collection, one chef-hat click away: import, translate, organise and cook in a native Omarchy window.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Simple Recipes",
+    "category": "Utilities",
+    "defaultSection": "right",
+    "allowMultiple": false
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {{ t('settings_title', ui_lang) }}
+{% endblock %}
+
+{% block content %}
+<a class="back" href="/">{{ t('back_to_recipes', ui_lang) }}</a>
+
+<div class="settings-shell">
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+    
+    {% if notice %}
+        <div class="notice">✓ {{ notice }}</div>
+    {% endif %}
+
+    <!-- 1. Language & Localization Card -->
+    <div class="settings-card">
+        <p class="eyebrow">{{ t('lang_eyebrow', ui_lang) }}</p>
+        <h1>{{ t('lang_heading', ui_lang) }}</h1>
+        <p class="card-desc">{{ t('lang_desc', ui_lang) }}</p>
+
+        <form method="post" action="/settings/language" class="settings-form" autocomplete="off">
+            <div class="form-group">
+                <label for="ui_language">{{ t('lang_layout_label', ui_lang) }}</label>
+                <select name="ui_language" id="ui_language" autocomplete="off">
+                    {% for code, name in languages.items() %}
+                    <option value="{{ code }}" {{ 'selected' if ui_lang == code }}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+                <small class="profile-input-help">
+                    {{ t('layout_help', ui_lang) }}
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="recipe_target_language">{{ t('lang_recipe_label', ui_lang) }}</label>
+                <select name="recipe_target_language" id="recipe_target_language" autocomplete="off">
+                    {% for code, name in target_languages.items() %}
+                    <option value="{{ code }}" {{ 'selected' if target_lang == code }}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+                <small class="profile-input-help">
+                    {{ t('target_help', ui_lang) }}
+                </small>
+            </div>
+
+            <button type="submit" class="btn-save-ai" style="align-self: flex-start;">
+                {{ t('lang_save_btn', ui_lang) }}
+            </button>
+        </form>
+    </div>
+
+    <!-- 2. AI Configuration Card -->
+    <div class="settings-card">
+        <p class="eyebrow">{{ t('ai_eyebrow', ui_lang) }}</p>
+        <h1>{{ t('ai_heading', ui_lang) }}</h1>
+        <p class="card-desc">{{ t('ai_desc', ui_lang) }}</p>
+
+        <form method="post" action="/settings/ai" id="ai-settings-form" class="settings-form" autocomplete="off">
+            <div class="form-group">
+                <label for="ai_provider">{{ t('ai_provider_label', ui_lang) }}</label>
+                <select name="ai_provider" id="ai_provider" autocomplete="off">
+                    <optgroup label="Local (ROCm / Desktop)">
+                        <option value="llamacpp" {% if current_ai_provider == 'llamacpp' %}selected{% endif %}>
+                            llama.cpp (Local ROCm)
+                        </option>
+                        <option value="lmstudio" {% if current_ai_provider == 'lmstudio' %}selected{% endif %}>
+                            LM Studio (Local)
+                        </option>
+                        <option value="ollama" {% if current_ai_provider == 'ollama' %}selected{% endif %}>
+                            Ollama (Local)
+                        </option>
+                    </optgroup>
+                    <optgroup label="Online AI (API Key / Subscription)">
+                        <option value="codex" {% if current_ai_provider == 'codex' %}selected{% endif %}>Codex — existing ChatGPT login</option>
+                        <option value="gemini" {% if current_ai_provider == 'gemini' %}selected{% endif %}>
+                            Google Gemini (Free tier available)
+                        </option>
+                        <option value="openai" {% if current_ai_provider == 'openai' %}selected{% endif %}>
+                            OpenAI API (separate API key)
+                        </option>
+                        <option value="groq" {% if current_ai_provider == 'groq' %}selected{% endif %}>
+                            Groq (High-Speed &amp; generous free tier)
+                        </option>
+                        <option value="openrouter" {% if current_ai_provider == 'openrouter' %}selected{% endif %}>
+                            OpenRouter (Claude, GPT, DeepSeek in one account)
+                        </option>
+                        <option value="deepseek" {% if current_ai_provider == 'deepseek' %}selected{% endif %}>
+                            DeepSeek (Low cost &amp; high quality)
+                        </option>
+                        <option value="mistral" {% if current_ai_provider == 'mistral' %}selected{% endif %}>
+                            Mistral AI (European AI provider)
+                        </option>
+                    </optgroup>
+                    <optgroup label="Custom">
+                        <option value="custom" {% if current_ai_provider == 'custom' %}selected{% endif %}>
+                            Custom (OpenAI-compatible)
+                        </option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <!-- Contextual Provider Help Box -->
+            <div id="provider-help" class="provider-help-box"></div>
+
+            <!-- Custom Server URL (shown only when custom is selected) -->
+            <div class="form-group" id="custom-url-group" hidden>
+                <label for="custom_url">{{ t('ai_custom_url_label', ui_lang) }}</label>
+                <input type="url" name="custom_url" id="custom_url" value="{{ current_custom_url or '' }}" placeholder="https://api.example.com/v1" autocomplete="off">
+                <small class="profile-input-help">e.g. <code>https://api.together.xyz/v1</code> or a local reverse proxy.</small>
+            </div>
+
+            <!-- API Key input (shown for online providers and custom) -->
+            <div class="form-group" id="api-key-group">
+                <label for="api_key_input">{{ t('ai_api_key_label', ui_lang) }}</label>
+                <div class="key-input-row">
+                    <input type="password" name="api_key" id="api_key_input" placeholder="Enter API Key…" autocomplete="new-password">
+                    <button type="button" class="btn-toggle-key" id="btn-toggle-key" title="Toggle key visibility">👁️</button>
+                </div>
+                <div id="key-status"></div>
+            </div>
+
+            <!-- Model Selection & Manual Override -->
+            <div class="form-group">
+                <label for="model_preset_select">{{ t('ai_recommended_model_label', ui_lang) }}</label>
+                <select id="model_preset_select" autocomplete="off"></select>
+            </div>
+
+            <div class="form-group">
+                <label for="ai_model_input">{{ t('ai_model_name_label', ui_lang) }}</label>
+                <input type="text" name="ai_model" id="ai_model_input" value="{{ current_ai_model or '' }}" placeholder="e.g. gemini-2.0-flash" required autocomplete="off">
+                <small class="profile-input-help">{{ t('ai_model_name_help', ui_lang) }}</small>
+            </div>
+
+            <!-- Live Test Status Area -->
+            <div id="test-status" class="test-result" hidden></div>
+
+            <!-- Action buttons -->
+            <div class="settings-actions">
+                <button type="button" class="btn-test" id="btn-test-connection">
+                    <span>🔌</span> {{ t('ai_test_btn', ui_lang) }}
+                </button>
+                <button type="submit" class="btn-save-ai">
+                    {{ t('ai_save_btn', ui_lang) }}
+                </button>
+            </div>
+        </form>
+
+        <!-- Confirmed full reset -->
+        <form method="post" action="/settings/reset" onsubmit="return confirm({{ t('ai_reset_confirm', ui_lang) | tojson | forceescape }});" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+            <input type="hidden" name="reset_confirm" value="delete-all">
+            <button type="submit" class="btn-reset-ai">
+                {{ t('ai_reset_btn', ui_lang) }}
+            </button>
+            <small class="profile-input-help" style="margin-top: 8px;">
+                {{ t('reset_help', ui_lang) }}
+            </small>
+        </form>
+    </div>
+
+    <!-- 3. Phone / WhatsApp Configuration Card -->
+    <div class="settings-card">
+        <p class="eyebrow">{{ t('notifications_eyebrow', ui_lang) }}</p>
+        <h2>{{ t('whatsapp_heading', ui_lang) }}</h2>
+        <p class="card-desc">{{ t('whatsapp_desc', ui_lang) }}</p>
+        
+        <form method="post" action="/settings/phone" class="settings-form" autocomplete="off">
+            <div class="form-group">
+                <label for="phone_number">{{ t('phone_label', ui_lang) }}</label>
+                <input id="phone_number" name="phone_number" type="tel" autocomplete="tel" value="{{ phone_number }}" placeholder="e.g. +49 170 1234567" required>
+                <small class="profile-input-help">{{ t('phone_help', ui_lang) }}</small>
+            </div>
+            <button type="submit" class="btn-save-ai" style="align-self: flex-start;">{{ t('phone_save_btn', ui_lang) }}</button>
+        </form>
+    </div>
+</div>
+
+<script>
+(() => {
+    const providers = {{ providers_json | safe }};
+    const savedKeys = {{ saved_keys | tojson }};
+    const maskedKeys = {{ masked_keys | tojson }};
+    const savedModels = {{ saved_models | tojson }};
+    const uiLang = {{ ui_lang | tojson }};
+
+    const providerSelect = document.getElementById('ai_provider');
+    const helpBox = document.getElementById('provider-help');
+    const customUrlGroup = document.getElementById('custom-url-group');
+    const apiKeyGroup = document.getElementById('api-key-group');
+    const apiKeyInput = document.getElementById('api_key_input');
+    const keyStatusEl = document.getElementById('key-status');
+    const btnToggleKey = document.getElementById('btn-toggle-key');
+    const modelPresetSelect = document.getElementById('model_preset_select');
+    const modelInput = document.getElementById('ai_model_input');
+    const btnTest = document.getElementById('btn-test-connection');
+    const testStatus = document.getElementById('test-status');
+
+    // Toggle password visibility
+    btnToggleKey.addEventListener('click', () => {
+        if (apiKeyInput.type === 'password') {
+            apiKeyInput.type = 'text';
+            btnToggleKey.textContent = '🔒';
+        } else {
+            apiKeyInput.type = 'password';
+            btnToggleKey.textContent = '👁️';
+        }
+    });
+
+    const updateUIForProvider = () => {
+        const p = providerSelect.value;
+        const cfg = providers[p] || {};
+
+        // Help text
+        helpBox.innerHTML = `<strong>${cfg.name || p}:</strong> ${cfg.help || ''}`;
+
+        // Custom URL visibility
+        customUrlGroup.hidden = (p !== 'custom');
+
+        // Key visibility
+        const needsKey = cfg.needs_key || p === 'custom';
+        apiKeyGroup.hidden = !needsKey;
+
+        if (needsKey) {
+            apiKeyInput.placeholder = cfg.key_placeholder ? `e.g. ${cfg.key_placeholder}` : 'Enter API Key…';
+            const isSaved = savedKeys[p];
+            const masked = maskedKeys[p];
+            if (isSaved && masked) {
+                const hint = window.recipeT('key_saved');
+                const leaveHint = window.recipeT('key_leave_empty_hint');
+                keyStatusEl.innerHTML = `<span class="key-status-badge">✓ ${hint}: <code>${masked}</code> ${leaveHint}</span>`;
+            } else {
+                const noKey = window.recipeT('key_not_saved');
+                keyStatusEl.innerHTML = `<span class="key-status-badge missing">${noKey}</span>`;
+            }
+        } else {
+            keyStatusEl.innerHTML = '';
+        }
+
+        // Models preset dropdown
+        modelPresetSelect.innerHTML = '';
+        const modelsList = cfg.models || [];
+        const activeModel = savedModels[p] || cfg.default_model || '';
+
+        modelsList.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            if (m === activeModel) opt.selected = true;
+            modelPresetSelect.appendChild(opt);
+        });
+
+        const customOpt = document.createElement('option');
+        customOpt.value = '__custom__';
+        customOpt.textContent = window.recipeT('ai_custom_model_option');
+        if (!modelsList.includes(activeModel) && activeModel) {
+            customOpt.selected = true;
+        }
+        modelPresetSelect.appendChild(customOpt);
+
+        modelInput.value = activeModel;
+
+        // Reset test banner
+        testStatus.hidden = true;
+    };
+
+    modelPresetSelect.addEventListener('change', () => {
+        if (modelPresetSelect.value !== '__custom__') {
+            modelInput.value = modelPresetSelect.value;
+        } else {
+            modelInput.focus();
+        }
+    });
+
+    modelInput.addEventListener('input', () => {
+        const currentVal = modelInput.value.trim();
+        let match = false;
+        for (let i = 0; i < modelPresetSelect.options.length; i++) {
+            if (modelPresetSelect.options[i].value === currentVal) {
+                modelPresetSelect.selectedIndex = i;
+                match = true;
+                break;
+            }
+        }
+        if (!match) {
+            modelPresetSelect.value = '__custom__';
+        }
+    });
+
+    providerSelect.addEventListener('change', updateUIForProvider);
+    updateUIForProvider();
+
+    // Test connection
+    btnTest.addEventListener('click', async () => {
+        const p = providerSelect.value;
+        const key = apiKeyInput.value.trim();
+        const model = modelInput.value.trim();
+        const customUrl = document.getElementById('custom_url').value.trim();
+
+        btnTest.disabled = true;
+        testStatus.hidden = false;
+        testStatus.className = 'test-result loading';
+        const testingMsg = window.recipeT('connection_testing');
+        testStatus.innerHTML = `<span>⏳</span> ${testingMsg} <strong>${providers[p]?.name || p}</strong>...`;
+
+        const formData = new FormData();
+        formData.append('provider', p);
+        formData.append('api_key', key);
+        formData.append('ai_model', model);
+        formData.append('custom_url', customUrl);
+
+        try {
+            const res = await fetch('/api/ai/test', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (data.success) {
+                testStatus.className = 'test-result success';
+                testStatus.innerHTML = `<span>✓</span> ${data.message}`;
+            } else {
+                testStatus.className = 'test-result error';
+                testStatus.innerHTML = `<span>✗</span> ${data.message}`;
+            }
+        } catch (err) {
+            testStatus.className = 'test-result error';
+            testStatus.innerHTML = `<span>✗</span> Error: ${err.message}`;
+        } finally {
+            btnTest.disabled = false;
+        }
+    });
+})();
+</script>
+{% endblock %}
