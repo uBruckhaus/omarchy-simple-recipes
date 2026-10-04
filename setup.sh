@@ -32,6 +32,7 @@ PartOf=graphical-session.target
 Type=simple
 ExecStart=/usr/bin/bash "$escaped_root/scripts/run.sh"
 ExecStopPost=-/usr/bin/systemctl --user stop llama-server.service
+ExecStopPost=-/usr/bin/systemctl --user stop ollama.service
 UMask=0077
 Restart=on-failure
 RestartSec=3

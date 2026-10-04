@@ -47,10 +47,10 @@ def configuration():
 
 def status():
     from .lmstudio import available, lcpp_available
-    from .codex_provider import available as codex_available
+    from .cli_providers import NAMES
     provider, url, model, key, ui, target = configuration()
-    if provider == "codex":
-        connected = codex_available()
+    if provider in NAMES:
+        connected = NAMES[provider].available()
     elif provider == "llamacpp":
         connected = lcpp_available()["online"]
     elif provider == "lmstudio":

@@ -1,7 +1,7 @@
 import json, os, time, re, threading
 import httpx
 from .recipe_languages import RECIPE_LANGUAGES
-from . import codex_provider
+from . import cli_providers
 
 BASE_URL = os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234/v1")
 MODEL = os.getenv("LM_STUDIO_MODEL", "google/gemma-4-26b-a4b-qat")
@@ -78,9 +78,10 @@ def normalize(
         "and calories per serving (null if unknown).\n\n"
     )
 
-    content = prompt + json.dumps(recipe, ensure_ascii=False) + "\n\nAdditional text:\n" + raw_text[:18000]
-    if base_url == codex_provider.BASE_URL:
-        return codex_provider.complete(content, model, SCHEMA["json_schema"]["schema"], timeout=300)
+    content = prompt + json.dumps(recipe, ensure_ascii=False) + "\n\nAdditional text:\n" + raw_text[:24000]
+    cli = cli_providers.backend(base_url)
+    if cli:
+        return cli.complete(content, model, SCHEMA["json_schema"]["schema"], timeout=300)
     
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     if "openrouter.ai" in base_url:

@@ -1,8 +1,170 @@
-import os, time, re, json
+import os, time, re, json, shutil
+from pathlib import Path
 import httpx
-from . import codex_provider
+from . import claude_provider, codex_provider
 from sqlalchemy import select
 from .models import Setting
+
+def is_local_llama_installed() -> bool:
+    """Check if local llama-server binary, service, or models exist on disk."""
+    if shutil.which("llama-server"):
+        return True
+    user_bin = Path.home() / ".local/bin/llama-server"
+    if user_bin.is_file() and os.access(user_bin, os.X_OK):
+        return True
+    service_file = Path.home() / ".config/systemd/user/llama-server.service"
+    if service_file.is_file():
+        return True
+    models_dir = Path(os.getenv("LLAMA_MODELS_DIR", "/mnt/ai/Models/llama.cpp-router"))
+    if models_dir.is_dir() and any(models_dir.glob("*.gguf")):
+        return True
+    return False
+
+def lmstudio_cli() -> str:
+    """LM Studio's `lms` command, which can start its headless server on demand."""
+    found = shutil.which("lms")
+    if found:
+        return found
+    candidate = Path.home() / ".lmstudio/bin/lms"
+    return str(candidate) if candidate.is_file() and os.access(candidate, os.X_OK) else ""
+
+def lmstudio_running() -> bool:
+    try:
+        url = os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234/v1").rstrip("/")
+        return httpx.get(f"{url}/models", timeout=0.3).status_code == 200
+    except Exception:
+        return False
+
+def is_lmstudio_available() -> bool:
+    """Check if LM Studio is installed (the app starts its server) or already reachable."""
+    return bool(lmstudio_cli()) or lmstudio_running()
+
+def get_lmstudio_models() -> list[str]:
+    """LLMs downloaded in LM Studio, from the running server or the `lms` catalog."""
+    native_url = os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234/v1").rstrip("/").removesuffix("/v1")
+    try:
+        data = httpx.get(f"{native_url}/api/v1/models", timeout=1).json()
+        models = [m["key"] for m in data.get("models", []) if m.get("type") == "llm" and m.get("key")]
+        if models:
+            return models
+    except Exception:
+        pass
+    cli = lmstudio_cli()
+    if cli:
+        try:
+            import subprocess
+            result = subprocess.run([cli, "ls", "--json"], capture_output=True, text=True, timeout=10)
+            return [m["modelKey"] for m in json.loads(result.stdout) if m.get("type") == "llm" and m.get("modelKey")]
+        except Exception:
+            pass
+    return []
+
+def get_ollama_models() -> list[str]:
+    """Models from the running server, else from the manifests in OLLAMA_MODELS (server may be stopped)."""
+    try:
+        url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/").removesuffix("/v1")
+        data = httpx.get(f"{url}/api/tags", timeout=1).json()
+        return [m["name"].removesuffix(":latest") for m in data.get("models", []) if m.get("name") and "embed" not in m["name"].lower()]
+    except Exception:
+        pass
+    models = []
+    for root in {Path(os.getenv("OLLAMA_MODELS", "/mnt/ai/Models")), Path.home() / ".ollama/models"}:
+        library = root / "manifests/registry.ollama.ai/library"
+        try:
+            for manifest in sorted(library.glob("*/*")):
+                name = manifest.parent.name + ("" if manifest.name == "latest" else ":" + manifest.name)
+                if "embed" not in name and name not in models:
+                    models.append(name)
+        except OSError:
+            pass
+    return models
+
+_online_models = {}
+
+def get_online_models(provider: str, api_key: str) -> list[str]:
+    """Ask an OpenAI-compatible provider which models this key may use (cached per key)."""
+    cfg = PROVIDERS.get(provider, {})
+    if not api_key or cfg.get("type") != "online" or not cfg.get("base_url", "").startswith("https://"):
+        return []
+    cache_key = (provider, hash(api_key))
+    if cache_key in _online_models:
+        return _online_models[cache_key]
+    models = []
+    try:
+        response = httpx.get(cfg["base_url"].rstrip("/") + "/models", headers={"Authorization": f"Bearer {api_key}"}, timeout=4)
+        response.raise_for_status()
+        skip = ("embed", "whisper", "tts", "dall-e", "image", "audio", "moderation", "transcribe", "realtime", "guard")
+        models = sorted({str(m.get("id", "")).removeprefix("models/") for m in response.json().get("data", [])
+                         if m.get("id") and not any(word in str(m["id"]).lower() for word in skip)})
+    except Exception:
+        return []
+    _online_models[cache_key] = models
+    return models
+
+def is_ollama_available() -> bool:
+    """Check if Ollama is reachable or installed locally (the app starts ollama.service on demand)."""
+    if shutil.which("ollama") or (Path.home() / ".local/bin/ollama").exists():
+        return True
+    try:
+        url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/").removesuffix("/v1")
+        resp = httpx.get(f"{url}/api/tags", timeout=0.15)
+        if resp.status_code == 200:
+            return True
+    except Exception:
+        pass
+    return False
+
+def get_provider_status(provider: str) -> tuple[bool, str]:
+    """Check readiness of a provider.
+    Returns (is_ready, status_key).
+    status_key corresponds to i18n keys:
+      'provider_ready'
+      'provider_not_installed'
+      'provider_not_configured'
+      'provider_not_logged_in'
+    """
+    from . import recipe_store as store
+
+    if provider == "llamacpp":
+        if is_local_llama_installed():
+            return True, "provider_ready"
+        return False, "provider_not_installed"
+
+    if provider == "codex":
+        if codex_provider.available():
+            return True, "provider_ready"
+        return False, "provider_not_logged_in"
+
+    if provider == "claude":
+        if claude_provider.available():
+            return True, "provider_ready"
+        return False, "provider_not_logged_in"
+
+    if provider == "lmstudio":
+        if is_lmstudio_available():
+            return True, "provider_ready"
+        return False, "provider_not_installed"
+
+    if provider == "ollama":
+        if is_ollama_available():
+            return True, "provider_ready"
+        return False, "provider_not_installed"
+
+    if provider in ("openai", "gemini", "groq", "xai", "openrouter", "deepseek", "mistral"):
+        saved_key = store.setting(f"{provider}_api_key") or os.getenv(f"{provider.upper()}_API_KEY", "")
+        if not saved_key and store.setting("ai_provider") == provider:
+            saved_key = store.setting("ai_api_key")
+        if saved_key:
+            return True, "provider_ready"
+        return False, "provider_not_configured"
+
+    if provider == "custom":
+        url = store.setting("custom_base_url")
+        if url:
+            return True, "provider_ready"
+        return False, "provider_not_configured"
+
+    return False, "provider_not_configured"
 
 def get_local_llama_models() -> list[str]:
     """Scan local directory /mnt/ai/Models/llama.cpp-router and query running llama-server."""
@@ -40,6 +202,16 @@ def get_local_llama_models() -> list[str]:
     return models
 
 PROVIDERS = {
+    "claude": {
+        "name": "Claude — existing Claude login",
+        "type": "online",
+        "base_url": claude_provider.BASE_URL,
+        "default_model": claude_provider.DEFAULT_MODEL,
+        "models": claude_provider.models(),
+        "needs_key": False,
+        "supports_translation": None,
+        "help": "Uses your existing Claude Code sign-in (claude.ai subscription) and its usage limits. Recipe text is sent to Anthropic. No API key required. claude-default uses Claude Code's default model.",
+    },
     "codex": {
         "name": "Codex — existing ChatGPT login",
         "type": "online",
@@ -73,7 +245,7 @@ PROVIDERS = {
         "models": ["google/gemma-4-26b-a4b-qat"],
         "needs_key": False,
         "supports_translation": None,
-        "help": "Runs locally via the LM Studio desktop application.",
+        "help": "Runs locally with LM Studio. The app starts the LM Studio server (lms server start) and loads the selected model when needed, and unloads it when the window is hidden.",
     },
     "ollama": {
         "name": "Ollama (Local)",
@@ -83,7 +255,7 @@ PROVIDERS = {
         "models": ["llama3.2", "qwen2.5", "mistral", "gemma2"],
         "needs_key": False,
         "supports_translation": None,
-        "help": "Local Ollama server instance (default port 11434).",
+        "help": "Local Ollama server on your GPU. The app starts ollama.service when needed and unloads the model and stops the service when the window is hidden. GGUFs in /mnt/ai/Models and models from ollama pull are listed automatically.",
     },
     "openai": {
         "name": "OpenAI (ChatGPT)",
@@ -117,6 +289,17 @@ PROVIDERS = {
         "supports_translation": None,
         "key_placeholder": "gsk_...",
         "help": "Ultra-fast inference provider with generous free tier (console.groq.com).",
+    },
+    "xai": {
+        "name": "xAI Grok",
+        "type": "online",
+        "base_url": "https://api.x.ai/v1",
+        "default_model": "grok-4",
+        "models": ["grok-4", "grok-3-mini"],
+        "needs_key": True,
+        "supports_translation": None,
+        "key_placeholder": "xai-...",
+        "help": "Grok models from xAI with an API key from console.x.ai. The model list is loaded from your account once the key is saved.",
     },
     "openrouter": {
         "name": "OpenRouter (All Models / Subscription)",
@@ -180,6 +363,11 @@ def get_providers_dict() -> dict:
         provs["llamacpp"]["default_model"] = "gemma-4-12B-it-QAT-Q4_0"
     elif local_lcpp:
         provs["llamacpp"]["default_model"] = local_lcpp[0]
+    for provider, discover in (("lmstudio", get_lmstudio_models), ("ollama", get_ollama_models)):
+        found = discover()
+        if found:
+            provs[provider]["models"] = found
+            provs[provider]["default_model"] = found[0]
     return provs
 
 def get_setting(db, key: str, default: str = "") -> str:
@@ -205,13 +393,14 @@ def reset_all_settings(db) -> dict:
     """Reset all AI provider keys, models, and custom URLs to pristine defaults.
     Reactivates local providers and dynamically detected models."""
     keys_to_clear = [
-        "ai_api_key", "ai_model", "custom_base_url", "codex_model",
+        "ai_api_key", "ai_model", "custom_base_url", "codex_model", "claude_model",
         "llamacpp_api_key", "llamacpp_model",
         "lmstudio_api_key", "lmstudio_model",
         "ollama_api_key", "ollama_model",
         "openai_api_key", "openai_model",
         "gemini_api_key", "gemini_model",
         "groq_api_key", "groq_model",
+        "xai_api_key", "xai_model",
         "openrouter_api_key", "openrouter_model",
         "deepseek_api_key", "deepseek_model",
         "mistral_api_key", "mistral_model",
@@ -234,10 +423,11 @@ def reset_all_settings(db) -> dict:
     }
 
 def test_connection(provider: str, base_url: str, model: str, api_key: str = "") -> dict:
-    if provider == "codex":
+    if provider in ("codex", "claude"):
+        cli = codex_provider if provider == "codex" else claude_provider
         try:
-            reply = codex_provider.text("Respond briefly with: OK", model or codex_provider.DEFAULT_MODEL)
-            return {"success": True, "message": f"Codex connected: {reply[:40]}", "model": model}
+            reply = cli.text("Respond briefly with: OK", model or cli.DEFAULT_MODEL)
+            return {"success": True, "message": f"{provider.capitalize()} connected: {reply[:40]}", "model": model}
         except ValueError as exc:
             return {"success": False, "message": str(exc)}
     provs = get_providers_dict()

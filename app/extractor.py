@@ -93,38 +93,75 @@ def text_steps(value):
             elif item.get("itemListElement"): out.extend(text_steps(item["itemListElement"]))
     return out
 
-def validate_public_url(url):
-    """SSRF guard: only public http(s) targets on standard ports may be fetched.
+def _public_addresses(url):
+    """Resolve a URL's host once and return (parsed URL, port, validated public addresses).
 
-    Blocks loopback, private/LAN, link-local (e.g. cloud metadata),
-    unspecified and multicast addresses – also when reached via hostnames
-    like 'localhost' or DNS services such as nip.io, because every resolved
-    address is checked.
+    Blocks loopback, private/LAN, link-local (e.g. cloud metadata), CGNAT,
+    unspecified, reserved and multicast addresses, also when reached through
+    hostnames such as 'localhost' or rebinding DNS services: every resolved
+    address must be public.
     """
-    parsed=urlparse(str(url))
+    parsed = urlparse(str(url))
     if parsed.scheme not in ("http", "https"):
         raise ValueError("Nur http(s)-Links dürfen importiert werden.")
-    host=parsed.hostname
+    host = parsed.hostname
     if not host:
         raise ValueError("Ungültiger Link.")
-    port=parsed.port or (443 if parsed.scheme == "https" else 80)
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
     if port not in (80, 443):
         raise ValueError("Nur Standard-Web-Ports (80/443) dürfen abgerufen werden.")
     try:
-        infos=socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except socket.gaierror:
-        raise ValueError("Hostname konnte nicht aufgelöst werden.")
+        raise ValueError("Hostname konnte nicht aufgelöst werden.") from None
+    addresses = []
     for info in infos:
-        ip=ipaddress.ip_address(info[4][0])
-        if (ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_unspecified
-                or ip.is_reserved or ip.is_multicast):
+        ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        if getattr(ip, "ipv4_mapped", None):
+            ip = ip.ipv4_mapped
+        if not ip.is_global or ip.is_multicast:
             raise ValueError("Interne Adressen dürfen nicht abgerufen werden.")
+        if ip not in addresses:
+            addresses.append(ip)
+    if not addresses:
+        raise ValueError("Hostname konnte nicht aufgelöst werden.")
+    return parsed, port, addresses
+
+
+def validate_public_url(url):
+    """Kept for callers that only need the yes/no check."""
+    _public_addresses(url)
     return True
 
-def _request_hook(request):
-    # Runs for every outgoing request, including redirects – so a public
-    # page cannot redirect us to an internal address.
-    validate_public_url(str(request.url))
+
+def fetch_public(url, timeout=25, max_redirects=5):
+    """GET a public URL without a second, independent DNS lookup.
+
+    The connection goes to an address that was validated above (the hostname is
+    never handed to the HTTP transport for resolution), while the Host header and
+    TLS SNI/certificate verification still use the original hostname. Redirects
+    are followed manually so every hop gets the same check.
+    """
+    for _ in range(max_redirects + 1):
+        parsed, port, addresses = _public_addresses(url)
+        ip = addresses[0]
+        literal = f"[{ip}]" if ip.version == 6 else str(ip)
+        netloc = literal if parsed.port is None else f"{literal}:{parsed.port}"
+        pinned = urlunparse(parsed._replace(netloc=netloc))
+        host_header = parsed.hostname if parsed.port is None else f"{parsed.hostname}:{parsed.port}"
+        with httpx.Client(timeout=timeout, follow_redirects=False) as client:
+            request = client.build_request("GET", pinned, headers={**HEADERS, "Host": host_header},
+                                           extensions={"sni_hostname": parsed.hostname})
+            response = client.send(request)
+            response.read()
+        if response.is_redirect and response.headers.get("location"):
+            from urllib.parse import urljoin
+            url = urljoin(url, response.headers["location"])
+            continue
+        response.raise_for_status()
+        return response
+    raise ValueError("Zu viele Weiterleitungen.")
+
 
 def extract(url):
     clean_url = canonicalize_url(url) or url
@@ -133,9 +170,8 @@ def extract(url):
         res = extract_media(clean_url, *source)
         res["source_url"] = clean_url
         return res
-    client = httpx.Client(headers=HEADERS, follow_redirects=True, timeout=25, event_hooks={"request": [_request_hook]})
-    response = client.get(clean_url)
-    response.raise_for_status(); soup = BeautifulSoup(response.text, "html.parser")
+    response = fetch_public(clean_url, timeout=25)
+    soup = BeautifulSoup(response.text, "html.parser")
     node = None
     for script in soup.select('script[type="application/ld+json"]'):
         try: node = find_recipe(json.loads(script.string or ""))
@@ -262,6 +298,49 @@ def extract_youtube_fallback(url):
     }
 
 
+def _caption_track(info):
+    """Pick the spoken-language captions: uploaded subtitles first, then YouTube's original-language auto captions."""
+    spoken = (info.get("language") or "").split("-")[0].lower()
+    for tracks, original_suffix in ((info.get("subtitles") or {}, None), (info.get("automatic_captions") or {}, "-orig")):
+        keys = [key for key in tracks if key != "live_chat" and tracks[key]]
+        preferred = ([key for key in keys if original_suffix and key.endswith(original_suffix)]
+                     + [key for key in keys if spoken and key.split("-")[0].lower() == spoken])
+        if original_suffix is None and not preferred:
+            preferred = keys[:1]
+        for key in preferred:
+            formats = {row.get("ext"): row.get("url") for row in tracks[key] if row.get("url")}
+            for ext in ("json3", "vtt"):
+                if formats.get(ext):
+                    return ext, formats[ext]
+    return None
+
+
+def media_transcript(info, limit=16000):
+    """Return the video's spoken text; descriptions often omit the actual recipe."""
+    track = _caption_track(info)
+    if not track:
+        return ""
+    ext, caption_url = track
+    try:
+        response = fetch_public(caption_url, timeout=15)
+        if ext == "json3":
+            lines = ["".join(segment.get("utf8", "") for segment in event.get("segs") or [])
+                     for event in response.json().get("events", [])]
+        else:
+            lines = [line for line in response.text.splitlines()
+                     if line.strip() and "-->" not in line and not line.startswith(("WEBVTT", "Kind:", "Language:", "NOTE"))]
+            lines = [re.sub(r"<[^>]+>", "", line) for line in lines]
+    except (httpx.HTTPError, ValueError):
+        return ""
+    words, previous = [], None
+    for line in lines:
+        line = re.sub(r"\[[^\]]{1,30}\]", " ", line).strip()
+        if line and line != previous:
+            words.append(line)
+        previous = line or previous
+    return re.sub(r"\s+", " ", " ".join(words)).strip()[:limit]
+
+
 def extract_media(url, source_type, emoji):
     """Extract title/description metadata from a supported video URL.
     Only public, login-free posts can be read; the AI pipeline structures the text afterwards.
@@ -300,6 +379,7 @@ def extract_media(url, source_type, emoji):
     raw = "\n".join(filter(None, [info.get("title"), info.get("description")]))
     text = clean_media_text(raw)
     return {
+        "transcript": media_transcript(info),
         "title": info.get("title") or f"{source_type}-Rezept",
         "emoji": emoji,
         "image_url": info.get("thumbnail", ""),

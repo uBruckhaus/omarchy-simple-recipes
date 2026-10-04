@@ -81,11 +81,13 @@ def select_model(provider, model, key="", custom_url=""):
         raise ValueError("Choose a provider and model")
     model = model.strip()
     with MODEL_SWITCH_LOCK:
-        if provider in ("llamacpp", "lmstudio"):
-            load_model(model, provider)
-        elif provider == "codex":
-            from .codex_provider import require_login
-            require_login()
+        from . import local_runtime
+        # Single entry point: frees the other runtimes and waits for VRAM before a local
+        # model loads; for online providers it releases what this app loaded.
+        local_runtime.ensure(provider=provider, model=model)
+        if provider in ("codex", "claude"):
+            from .cli_providers import NAMES
+            NAMES[provider].require_login()
         values = {"ai_provider": provider, f"{provider}_model": model, "ai_model": model, "ai_enabled": "1"}
         if key.strip() and PROVIDERS[provider].get("needs_key"):
             values[f"{provider}_api_key"] = key.strip()
@@ -238,16 +240,25 @@ def delete_recipe(rid):
         db.execute(delete(Recipe).where(Recipe.id == rid)); db.commit()
 
 
-def import_recipe(url, use_ai=False, target_language=None):
+def _ai_source_text(raw, transcript):
+    if not transcript:
+        return raw
+    return (raw + "\n\nVideo transcript (spoken recipe):\n" + transcript).strip()
+
+
+def import_recipe(url, use_ai=False, target_language=None, progress=None):
+    report = progress or (lambda step: None)
     url = url.strip()
     clean_url = canonicalize_url(url) or url
     with SessionLocal() as db:
         existing = db.scalar(select(Recipe).where(Recipe.source_url.in_([url, clean_url])))
         if existing:
             return {"id": existing.id, "duplicate": True, "without_ai": False}
+    report("progress_reading")
     data = extract(url)
     data["source_url"] = clean_url
     raw = data.pop("raw_text", "")
+    transcript = data.pop("transcript", "")
     if raw:
         ingredients, instructions = split_recipe_text(raw)
         if not data.get("ingredients"):
@@ -255,20 +266,31 @@ def import_recipe(url, use_ai=False, target_language=None):
         if not data.get("instructions"):
             data["instructions"] = instructions
     without_ai = False
+    ai_error = ""
     if use_ai:
         cfg = configuration()
         target = target_language or setting("recipe_target_language", "en")
         try:
-            require_translation(cfg["base_url"], cfg["model"], target, cfg["api_key"])
-            translated = normalize(dict(data), raw, base_url=cfg["base_url"], model=cfg["model"],
+            report("progress_checking")
+            try:
+                require_translation(cfg["base_url"], cfg["model"], target, cfg["api_key"])
+            except ValueError as exc:
+                raise TranslationUnavailable(str(exc)) from exc
+            report("progress_ai")
+            translated = normalize(dict(data), _ai_source_text(raw, transcript), base_url=cfg["base_url"], model=cfg["model"],
                                   api_key=cfg["api_key"], target_lang=target,
                                   ui_lang=setting("ui_language", "en"),
-                                  max_tokens=8000 if cfg["provider"] == "llamacpp" else 4000)
+                                  max_tokens=8000 if cfg["provider"] in ("llamacpp", "lmstudio", "ollama") else 4000)
             if not all(isinstance(translated.get(key), list) and translated[key] and all(isinstance(item, str) for item in translated[key]) for key in ("ingredients", "instructions")):
-                raise ValueError("AI returned an incomplete recipe")
+                raise IncompleteRecipeTranslation("AI returned an incomplete recipe")
             data.update(translated)
+        except TranslationUnavailable:
+            without_ai, ai_error = True, "translation_unavailable"
+        except IncompleteRecipeTranslation:
+            without_ai, ai_error = True, "ai_no_recipe"
         except Exception:
-            without_ai = True
+            without_ai, ai_error = True, "ai_request_failed"
+    report("progress_saving")
     if not data.get("instructions") and raw:
         data["instructions"] = [line.strip() for line in raw.splitlines() if line.strip()]
     allowed = {column.name for column in Recipe.__table__.columns} - {"id", "created_at"}
@@ -283,14 +305,16 @@ def import_recipe(url, use_ai=False, target_language=None):
             return {"id": existing.id, "duplicate": True, "without_ai": False}
         row = Recipe(**data)
         db.add(row); db.commit(); db.refresh(row)
-        return {"id": row.id, "duplicate": False, "without_ai": without_ai}
+        return {"id": row.id, "duplicate": False, "without_ai": without_ai, "ai_error": ai_error}
 
 
-def reprocess(rid, target):
+def reprocess(rid, target, progress=None):
+    report = progress or (lambda step: None)
     original = recipe(rid)
     if original is None:
         raise ValueError("Recipe not found")
     cfg = configuration()
+    report("progress_checking")
     try:
         require_translation(cfg["base_url"], cfg["model"], target, cfg["api_key"])
     except ValueError as exc:
@@ -298,12 +322,15 @@ def reprocess(rid, target):
     source = {key: original[key] for key in ("title", "ingredients", "instructions", "tags", "duration_minutes", "servings", "calories")}
     raw = ""
     if (not source["ingredients"] or not source["instructions"]) and (original.get("source_url") or "").startswith(("https://", "http://")):
+        report("progress_reading")
         extracted = extract(original["source_url"])
         raw = extracted.get("raw_text", "")
         ingredients, instructions = split_recipe_text(raw)
+        raw = _ai_source_text(raw, extracted.get("transcript", ""))
         for name, fallback in (("ingredients", ingredients), ("instructions", instructions)):
             if not source[name]:
                 source[name] = extracted.get(name) or fallback
+    report("progress_ai")
     cleaned = normalize(source, raw,
                         base_url=cfg["base_url"], model=cfg["model"], api_key=cfg["api_key"], target_lang=target,
                         ui_lang=setting("ui_language", "en"), max_tokens=8000)

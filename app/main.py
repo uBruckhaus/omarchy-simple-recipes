@@ -375,10 +375,10 @@ def index(request:Request, q:str="", sort:str="newest", category:str="", view:st
         saved_key = get_setting(db, f"{saved_provider}_api_key") or get_setting(db, "ai_api_key")
         is_online = provs.get(saved_provider, {}).get("type") == "online"
         codex_ready = False
-        if saved_provider == "codex":
-            from .codex_provider import available as codex_available
-            codex_ready = codex_available()
-        ai_online = lm["online"] or lcpp["online"] or codex_ready or (is_online and bool(saved_key) and saved_provider != "codex")
+        if saved_provider in ("codex", "claude"):
+            from .cli_providers import NAMES
+            codex_ready = NAMES[saved_provider].available()
+        ai_online = lm["online"] or lcpp["online"] or codex_ready or (is_online and bool(saved_key) and saved_provider not in ("codex", "claude"))
         saved_model = get_setting(db, f"{saved_provider}_model") or get_setting(db, "ai_model")
 
         context = {
@@ -463,9 +463,9 @@ def select_model(provider, model, custom_url=""):
     if provider not in PROVIDERS or not model.strip():
         raise ValueError("Choose a provider and model")
     model = model.strip()
-    if provider == "codex":
-        from .codex_provider import require_login
-        require_login()
+    if provider in ("codex", "claude"):
+        from .cli_providers import NAMES
+        NAMES[provider].require_login()
     with MODEL_SWITCH_LOCK:
         if provider in ("llamacpp", "lmstudio"):
             load_model(model, provider)

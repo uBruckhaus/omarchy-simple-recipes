@@ -57,3 +57,52 @@ for key, labels in {
     KEYS.append(key)
     for language, label in zip(['en', 'de', 'fr', 'it', 'es'], labels):
         TEXT[language][key] = label
+
+for key, labels in {
+    'claude': ['Claude — existing Claude login', 'Claude — vorhandene Claude-Anmeldung', 'Claude — connexion Claude existante', 'Claude — accesso Claude esistente', 'Claude — sesión de Claude existente'],
+    'importing': ['Importing recipe…', 'Rezept wird importiert…', 'Importation de la recette…', 'Importazione della ricetta…', 'Importando receta…'],
+    'reprocessing': ['AI is reprocessing the recipe…', 'KI überarbeitet das Rezept…', 'L’IA retraite la recette…', 'L’IA rielabora la ricetta…', 'La IA está reprocesando la receta…'],
+    'searching': ['Searching YouTube…', 'YouTube wird durchsucht…', 'Recherche sur YouTube…', 'Ricerca su YouTube…', 'Buscando en YouTube…'],
+    'progress_starting_ai': ['Starting the local AI server and loading the model…', 'Lokaler KI-Server wird gestartet und Modell geladen…', 'Démarrage du serveur IA local et chargement du modèle…', 'Avvio del server IA locale e caricamento del modello…', 'Iniciando el servidor de IA local y cargando el modelo…'],
+    'progress_reading': ['Reading the source (page, video description and transcript)…', 'Quelle wird gelesen (Seite, Videobeschreibung und Transkript)…', 'Lecture de la source (page, description et transcription)…', 'Lettura della fonte (pagina, descrizione e trascrizione)…', 'Leyendo la fuente (página, descripción y transcripción)…'],
+    'progress_checking': ['Checking the AI model and target language…', 'KI-Modell und Zielsprache werden geprüft…', 'Vérification du modèle IA et de la langue cible…', 'Verifica del modello IA e della lingua di destinazione…', 'Comprobando el modelo de IA y el idioma de destino…'],
+    'progress_ai': ['AI is extracting and translating ingredients and steps… this can take a minute.', 'KI extrahiert und übersetzt Zutaten und Schritte… das kann eine Minute dauern.', 'L’IA extrait et traduit ingrédients et étapes… cela peut prendre une minute.', 'L’IA estrae e traduce ingredienti e passaggi… può richiedere un minuto.', 'La IA extrae y traduce ingredientes y pasos… puede tardar un minuto.'],
+    'progress_saving': ['Saving the recipe…', 'Rezept wird gespeichert…', 'Enregistrement de la recette…', 'Salvataggio della ricetta…', 'Guardando la receta…'],
+    'ai_no_recipe': ['The AI found no ingredients or steps in this source (page, video description or transcript). The original text was saved; you can edit it or try another source.', 'Die KI hat in dieser Quelle (Seite, Videobeschreibung oder Transkript) keine Zutaten oder Schritte gefunden. Der Originaltext wurde gespeichert; du kannst ihn bearbeiten oder eine andere Quelle versuchen.', 'L’IA n’a trouvé ni ingrédients ni étapes dans cette source. Le texte original a été enregistré.', 'L’IA non ha trovato ingredienti o passaggi in questa fonte. Il testo originale è stato salvato.', 'La IA no encontró ingredientes ni pasos en esta fuente. Se guardó el texto original.'],
+    'ai_request_failed': ['The AI request failed (login, usage limit, timeout or invalid answer). The original text was saved; use the AI button in the library to retry.', 'Die KI-Anfrage ist fehlgeschlagen (Anmeldung, Nutzungslimit, Zeitüberschreitung oder ungültige Antwort). Der Originaltext wurde gespeichert; über die KI-Schaltfläche in der Sammlung erneut versuchen.', 'La requête IA a échoué (connexion, quota, délai ou réponse invalide). Le texte original a été enregistré ; réessayez depuis la collection.', 'La richiesta IA non è riuscita (accesso, limite, timeout o risposta non valida). Il testo originale è stato salvato; riprova dalla raccolta.', 'La solicitud de IA falló (sesión, límite, tiempo de espera o respuesta no válida). Se guardó el texto original; reinténtalo desde la colección.'],
+    'pick_hint': ['Click a video to use it for import · double-click to watch', 'Video anklicken, um es zu importieren · Doppelklick zum Ansehen', 'Cliquez sur une vidéo pour l’importer · double-clic pour la voir', 'Clicca un video per importarlo · doppio clic per guardarlo', 'Haz clic en un vídeo para importarlo · doble clic para verlo'],
+    'video_picked': ['Video link added — press Import to start.', 'Videolink übernommen — Importieren drücken, um zu starten.', 'Lien ajouté — appuyez sur Importer.', 'Link aggiunto — premi Importa.', 'Enlace añadido — pulsa Importar.'],
+}.items():
+    KEYS.append(key)
+    for language, label in zip(['en', 'de', 'fr', 'it', 'es'], labels):
+        TEXT[language][key] = label
+
+for key, labels in {
+    'check_languages': ['Check languages', 'Sprachen prüfen', 'Vérifier les langues', 'Verifica lingue', 'Comprobar idiomas'],
+    'ai_settings': ['AI settings…', 'KI-Einstellungen…', 'Réglages IA…', 'Impostazioni IA…', 'Ajustes de IA…'],
+    'ai_off_hint': ['AI is off: recipes are saved as found. Choose a provider in AI settings to extract and translate them.',
+                    'KI ist aus: Rezepte werden unverändert gespeichert. In den KI-Einstellungen einen Anbieter wählen, um sie zu extrahieren und zu übersetzen.',
+                    'IA désactivée : les recettes sont enregistrées telles quelles. Choisissez un fournisseur dans les réglages IA.',
+                    'IA disattivata: le ricette vengono salvate così come sono. Scegli un fornitore nelle impostazioni IA.',
+                    'IA desactivada: las recetas se guardan tal cual. Elige un proveedor en los ajustes de IA.'],
+    'video_empty': ['Search for a dish — matching recipe videos appear here.', 'Nach einem Gericht suchen — passende Rezeptvideos erscheinen hier.',
+                    'Cherchez un plat — les vidéos de recettes apparaissent ici.', 'Cerca un piatto — i video delle ricette appariranno qui.',
+                    'Busca un plato — los vídeos de recetas aparecerán aquí.'],
+    'categories_heading': ['Categories', 'Kategorien', 'Catégories', 'Categorie', 'Categorías'],
+    'data_heading': ['Data & backup', 'Daten & Sicherung', 'Données et sauvegarde', 'Dati e backup', 'Datos y copia de seguridad'],
+    'filter_results': ['Filter these videos by title…', 'Diese Videos nach Titel filtern…', 'Filtrer ces vidéos par titre…', 'Filtra questi video per titolo…', 'Filtrar estos vídeos por título…'],
+    'maintenance_heading': ['Setup & reset', 'Einrichtung & Zurücksetzen', 'Configuration et réinitialisation', 'Configurazione e ripristino', 'Configuración y restablecimiento'],
+}.items():
+    KEYS.append(key)
+    for language, label in zip(['en', 'de', 'fr', 'it', 'es'], labels):
+        TEXT[language][key] = label
+
+# Claude joined Codex as a signed-in provider; local models now follow a GPU release rule.
+for language, label in {
+    'en': 'Online AI receives the recipe text and uses your account limits. Claude and Codex keep their own logins; the app never copies them. Other API keys are stored in your private database. Local models run on your GPU: only one is loaded at a time, and it is unloaded when this window is hidden or closed.',
+    'de': 'Online-KI erhält den Rezepttext und nutzt Ihre Kontingente. Claude und Codex verwalten ihre Anmeldung selbst; die App kopiert sie nie. Andere API-Schlüssel liegen in Ihrer privaten Datenbank. Lokale Modelle laufen auf Ihrer GPU: Es ist immer nur eines geladen, und es wird entladen, sobald dieses Fenster ausgeblendet oder geschlossen wird.',
+    'fr': 'L’IA en ligne reçoit le texte et utilise votre quota. Claude et Codex gèrent leur connexion ; les autres clés API sont stockées dans votre base privée. Les modèles locaux tournent sur votre GPU : un seul est chargé à la fois et il est déchargé quand cette fenêtre est masquée.',
+    'it': 'L’IA online riceve il testo e usa la quota del tuo account. Claude e Codex gestiscono l’accesso; le altre chiavi API sono nel database privato. I modelli locali usano la GPU: ne viene caricato uno alla volta e viene scaricato quando la finestra è nascosta.',
+    'es': 'La IA online recibe el texto y usa tu cuota. Claude y Codex gestionan su sesión; las otras claves API se guardan en la base privada. Los modelos locales usan tu GPU: solo se carga uno a la vez y se descarga al ocultar esta ventana.',
+}.items():
+    TEXT[language]['privacy'] = label

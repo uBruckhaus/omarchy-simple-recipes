@@ -34,7 +34,7 @@ def send(command, argument=None, timeout=2):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["ping", "show", "hide", "toggle", "settings", "recipe", "quit"])
+    parser.add_argument("command", choices=["ping", "show", "hide", "toggle", "settings", "recipe", "tab", "quit"])
     parser.add_argument("argument", nargs="?", type=int)
     parser.add_argument("--wait", type=float, default=0)
     args = parser.parse_args()

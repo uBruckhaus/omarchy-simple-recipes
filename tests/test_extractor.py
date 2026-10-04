@@ -114,3 +114,72 @@ def test_video_description_separates_ingredients_and_steps_without_ai():
     ingredients, steps = split_recipe_text('My soup\nIngredients:\n- 2 g salt\n- 1 L water\nInstructions:\n1. Add salt.\n2. Boil.\nNotes:\nSubscribe!')
     assert ingredients == ['2 g salt', '1 L water']
     assert steps == ['1. Add salt.', '2. Boil.']
+
+
+def test_caption_track_prefers_uploaded_then_original_auto_captions():
+    from app.extractor import _caption_track
+    info = {"language": "de", "subtitles": {}, "automatic_captions": {
+        "en": [{"ext": "json3", "url": "https://yt/en"}], "de-orig": [{"ext": "vtt", "url": "https://yt/de-vtt"}, {"ext": "json3", "url": "https://yt/de"}]}}
+    assert _caption_track(info) == ("json3", "https://yt/de")
+    info["subtitles"] = {"live_chat": [{"ext": "json", "url": "x"}], "de": [{"ext": "vtt", "url": "https://yt/manual"}]}
+    assert _caption_track(info) == ("vtt", "https://yt/manual")
+    assert _caption_track({"automatic_captions": {"fr": [{"ext": "json3", "url": "u"}]}}) is None
+
+
+def test_media_transcript_joins_caption_events():
+    from unittest.mock import MagicMock, patch
+    from app import extractor
+    response = MagicMock()
+    response.json.return_value = {"events": [{"segs": [{"utf8": "[Musik]"}]}, {"segs": [{"utf8": "drei Eier "}, {"utf8": "200 Gramm Mehl"}]}, {"segs": [{"utf8": "\n"}]}]}
+    with patch.object(extractor, "_caption_track", return_value=("json3", "https://yt/cap")), patch.object(extractor, "fetch_public", return_value=response):
+        assert extractor.media_transcript({}) == "drei Eier 200 Gramm Mehl"
+
+
+def _addrinfo(*ips):
+    import socket
+    return [(socket.AF_INET6 if ":" in ip else socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 443)) for ip in ips]
+
+
+def test_fetch_public_connects_to_the_validated_address_not_a_second_lookup():
+    from unittest.mock import MagicMock, patch
+    import httpx
+    from app import extractor
+    sent = []
+    def send(request, **_):
+        sent.append(request)
+        return httpx.Response(200, text="<html>ok</html>", request=request)
+    lookups = iter([_addrinfo("93.184.216.34"), _addrinfo("127.0.0.1")])  # a rebinding DNS answer would come second
+    with patch.object(extractor.socket, "getaddrinfo", side_effect=lambda *a, **k: next(lookups)), \
+         patch.object(httpx.Client, "send", side_effect=send):
+        response = extractor.fetch_public("https://recipes.example/soup")
+    assert response.text == "<html>ok</html>" and len(sent) == 1
+    assert sent[0].url.host == "93.184.216.34"
+    assert sent[0].headers["Host"] == "recipes.example"
+    assert sent[0].extensions["sni_hostname"] == "recipes.example"
+
+
+def test_fetch_public_rejects_private_and_mixed_dns_answers_before_connecting():
+    import pytest
+    from unittest.mock import patch
+    import httpx
+    from app import extractor
+    for answer in (_addrinfo("10.0.0.5"), _addrinfo("93.184.216.34", "192.168.1.10"), _addrinfo("::ffff:127.0.0.1"), _addrinfo("100.64.0.1")):
+        with patch.object(extractor.socket, "getaddrinfo", return_value=answer), patch.object(httpx.Client, "send") as send:
+            with pytest.raises(ValueError):
+                extractor.fetch_public("https://rebind.example/")
+        send.assert_not_called()
+
+
+def test_fetch_public_checks_every_redirect_hop():
+    import pytest
+    from unittest.mock import patch
+    import httpx
+    from app import extractor
+    answers = {"public.example": _addrinfo("93.184.216.34"), "internal.example": _addrinfo("10.1.2.3")}
+    def send(request, **_):
+        return httpx.Response(302, headers={"location": "http://internal.example/admin"}, request=request)
+    with patch.object(extractor.socket, "getaddrinfo", side_effect=lambda host, *a, **k: answers[host]), \
+         patch.object(httpx.Client, "send", side_effect=send) as sent:
+        with pytest.raises(ValueError, match="Interne"):
+            extractor.fetch_public("https://public.example/recipe")
+    assert sent.call_count == 1

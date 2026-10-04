@@ -6,11 +6,14 @@
 
 Simple Recipes brings recipe importing, a searchable library and a comfortable cooking view to Omarchy. Click the chef hat in your bar to open a native Python window that follows your desktop theme. Recipes live in a local SQLite database, without a browser or database server.
 
-- **Import and translate:** import public recipe pages or YouTube links; optional AI extracts ingredients and preparation steps and translates both into your chosen language.
+- **Import and translate:** import public recipe pages or YouTube links; optional AI extracts ingredients and preparation steps (for videos also from the spoken transcript) and translates both into your chosen language.
 - **Find something to cook:** search your library, group by category, assign categories, keep favourites and track recipes you have tried.
 - **Preview before importing:** two-column YouTube results with thumbnails, video duration, channel filters, 1–50 results and a preferred search language.
 - **Cook comfortably:** a focused step-by-step window, adjustable text size and a timer.
-- **Use your preferred AI:** a configured local llama.cpp server, Codex with an existing ChatGPT login, or supported online API providers.
+- **Use your preferred AI:** Claude or Codex through their existing logins (detected automatically), a local llama.cpp router, LM Studio or Ollama, or online API providers (OpenAI, Gemini, Groq, xAI Grok, OpenRouter, DeepSeek, Mistral, custom). Local and account model lists are discovered automatically.
+- **GPU-friendly local AI:** only one local model is resident at a time. Before a model loads, other local runtimes are released and the app waits until GPU memory is actually free; hiding or closing the window unloads it again.
+- **Clear progress:** a prominent status banner shows each step (reading the source, checking the model, extracting and translating) with elapsed time, and explains why AI processing did not happen when it fails.
+- **21 interface languages:** English, German, French, Italian, Spanish, Portuguese, Dutch, Nordic languages, Polish, Turkish, Russian, Ukrainian, Chinese, Japanese, Korean, Arabic (right-to-left) and Hindi are built in.
 - **Keep your recipes:** SQLite backups and recipe-only JSON export/restore; your data stays outside the plugin directory.
 
 ## Install
@@ -31,17 +34,17 @@ See the [user manual and setup help](USER_GUIDE.md).
 
 ## Languages and AI
 
-English, German, French, Italian and Spanish interfaces are built in. A configured model is checked against 21 target languages, including Chinese, Japanese, Hindi, European/Brazilian Portuguese, Swedish, Danish and Norwegian Bokmål. Successfully checked targets are selectable. Additional interface translations can be generated and cached with that model. Selecting an interface language also selects the same recipe target; you may then change the target separately. Measurement conventions follow the interface: English uses US kitchen units; other interfaces use metric units and Celsius.
+The interface ships in all 21 languages: English, German, French, Italian, Spanish, European/Brazilian Portuguese, Swedish, Danish, Norwegian Bokmål, Dutch, Polish, Turkish, Russian, Ukrainian, Simplified/Traditional Chinese, Japanese, Korean, Arabic (right-to-left) and Hindi. No model is needed to switch the interface language. A configured model is checked against 21 target languages, including Chinese, Japanese, Hindi, European/Brazilian Portuguese, Swedish, Danish and Norwegian Bokmål. Successfully checked targets are selectable. Selecting an interface language also selects the same recipe target; you may then change the target separately. Measurement conventions follow the interface: English uses US kitchen units; other interfaces use metric units and Celsius.
 
 AI translations depend on source quality and model output. Failed AI imports retain the original text and show a notice; failed reprocessing leaves the saved recipe unchanged. Reprocessing an incomplete imported recipe retrieves its original source to recover missing ingredients or instructions. YouTube search language is a preference, not a strict spoken-language filter.
 
-**Local AI lifecycle:** local mode expects your separately configured `llama-server.service` and a compatible llama.cpp router. The next AI operation starts that service and loads your saved model. Hiding or closing the recipe window stops `llama-server.service` after current work finishes to release GPU memory. Stopping the recipe service also stops it. This affects other apps sharing that AI service. Online providers do not need this local service.
+**Local AI lifecycle:** local providers use what you already run: a llama.cpp router as `llama-server.service`, LM Studio (`lms server start`, started on demand) or Ollama as `ollama.service`. Installation does not install any of them. The next AI operation starts the selected runtime and loads your saved model; before that, other local runtimes are released and the app waits until GPU memory has actually dropped, so two models never fill the GPU together. Hiding, minimizing or closing the window unloads the model and stops the services this app used after current work finishes; stopping the recipe service does the same. This affects other apps that share those local AI services at the same moment. Online providers and Claude/Codex need no local service.
 
 ## Data and external services
 
-Recipes and settings are stored at `~/.local/share/simple-recipes/data/rezepte.db`. Python includes SQLite; no separate database package or server is needed. Source imports, video search, previews and sharing contact external services. Online AI sends recipe text to the selected provider and may consume account limits or paid requests. Codex uses its existing login through isolated, ephemeral requests with command tools disabled; the plugin does not read its authentication file.
+Recipes and settings are stored at `~/.local/share/simple-recipes/data/rezepte.db`. Python includes SQLite; no separate database package or server is needed. Source imports, video search, previews and sharing contact external services. Online AI sends recipe text to the selected provider and may consume account limits or paid requests. Claude and Codex use their existing logins through isolated, ephemeral command-line requests with all tools, plugins and integrations disabled; the plugin never reads their authentication files. Recipe imports fetch only public addresses: the host name is resolved once, every address must be public, and the connection is pinned to a checked address for each redirect (no second DNS lookup).
 
-API keys are stored in the owner-only local database. Complete SQLite backups include credentials; keep them private. Recipe JSON exports exclude credentials. Reset requires confirmation and clears recipes, categories, phone number, keys, preferences and YouTube search. Reset and first-run setup restore search defaults to 10 results and all languages. Reset does not sign you out of Codex.
+API keys are stored in the owner-only local database. Complete SQLite backups include credentials; keep them private. Recipe JSON exports exclude credentials. Reset requires confirmation and clears recipes, categories, phone number, keys, preferences and YouTube search. Reset and first-run setup restore search defaults to 10 results and all languages. Reset does not sign you out of Claude or Codex.
 
 ## Update or remove
 

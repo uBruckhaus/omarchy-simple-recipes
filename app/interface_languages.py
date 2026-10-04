@@ -1,10 +1,32 @@
-"""Model-translated desktop labels, generated on demand and cached in SQLite."""
+"""Desktop labels for non-built-in languages: shipped in app/locales, or model-generated and cached in SQLite."""
 import json
+from pathlib import Path
 
 from . import recipe_store as store
 from .i18n import TRANSLATIONS, CATEGORY_TRANSLATIONS, DURATION_CLASS_TRANSLATIONS
 from .native_locales import TEXT
 from .recipe_languages import RECIPE_LANGUAGES
+
+
+BUILT_IN = ('en', 'de', 'fr', 'it', 'es')
+LOCALES = Path(__file__).resolve().parent / 'locales'
+
+
+def shipped(language):
+    """Pre-translated interface labels bundled with the plugin."""
+    if '/' in language or '.' in language:
+        return {}
+    try:
+        values = json.loads((LOCALES / f'{language}.json').read_text())
+    except (OSError, ValueError):
+        return {}
+    return values if isinstance(values, dict) else {}
+
+
+def available():
+    """Interface languages usable without a model."""
+    from .i18n import TARGET_LANGUAGES
+    return [code for code in TARGET_LANGUAGES if code in BUILT_IN or shipped(code) or store.setting('interface_translation_' + code)]
 
 
 def source_strings():
@@ -25,10 +47,11 @@ def apply(language, values):
 
 
 def load(language):
-    if language in ('en', 'de', 'fr', 'it', 'es'):
+    if language in BUILT_IN:
         return True
     try:
-        values = json.loads(store.setting('interface_translation_' + language, '{}'))
+        # A translation the user generated with their own model wins over the shipped one.
+        values = {**shipped(language), **json.loads(store.setting('interface_translation_' + language, '{}'))}
         if not isinstance(values, dict) or not values.get('native.import_tab') or not values.get('ui.ingredients'):
             return False
         # New labels introduced by an update may use English until refreshed;
@@ -47,9 +70,10 @@ def generate(language):
               '. Keep all property names unchanged. Preserve HTML tags, placeholders, arrows and numeric ranges. '
               'Use clear, concise interface labels. Return the complete JSON object only.\n' + json.dumps(source, ensure_ascii=False))
     schema = {'type': 'object', 'properties': {key: {'type': 'string'} for key in source}, 'required': list(source), 'additionalProperties': False}
-    from .codex_provider import BASE_URL, complete
-    if cfg['base_url'] == BASE_URL:
-        values = complete(prompt, cfg['model'], schema, timeout=300)
+    from .cli_providers import backend
+    cli = backend(cfg['base_url'])
+    if cli:
+        values = cli.complete(prompt, cfg['model'], schema, timeout=300)
     else:
         import httpx
         headers = {'Authorization': 'Bearer ' + cfg['api_key']} if cfg['api_key'] else {}

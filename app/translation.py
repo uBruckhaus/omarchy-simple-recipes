@@ -9,7 +9,7 @@ import unicodedata
 import httpx
 
 from .recipe_languages import RECIPE_LANGUAGES
-from . import codex_provider
+from . import cli_providers
 
 PROBES = {code: (info["prompt_name"], "Füge 2 Gramm Salz hinzu." if code == "en" else "Add 2 grams of salt.")
           for code, info in RECIPE_LANGUAGES.items()}
@@ -65,7 +65,8 @@ def _valid_translation(text, target_lang):
 
 
 def check_translation(base_url, model, target_lang, api_key=""):
-    if base_url == codex_provider.BASE_URL:
+    cli = cli_providers.backend(base_url)
+    if cli:
         api_key = ""
     if target_lang not in PROBES:
         return {"success": False, "status": "unsupported_language", "message": "Choose a supported target language."}
@@ -96,8 +97,8 @@ def check_translation(base_url, model, target_lang, api_key=""):
         f"Translate this cooking instruction into {language}. Preserve the amount and unit; write the amount as the digit 2. Reply only with the translated sentence, without explanation: {source}"}],
         "max_tokens": 1024, "reasoning_effort": "none"}
     try:
-        if base_url == codex_provider.BASE_URL:
-            reply = codex_provider.text(payload["messages"][0]["content"], model)
+        if cli:
+            reply = cli.text(payload["messages"][0]["content"], model)
         else:
             response = httpx.post(f"{base_url.rstrip('/')}/chat/completions", json=payload, headers=headers, timeout=45)
             if response.status_code in (400, 422):
@@ -135,8 +136,9 @@ def require_translation(base_url, model, target_lang, api_key=""):
 def available_languages(base_url, model, api_key=""):
     from concurrent.futures import ThreadPoolExecutor
     from .i18n import LANGUAGES, TARGET_LANGUAGES
-    if base_url == codex_provider.BASE_URL:
-        results = _codex_languages(model)
+    cli = cli_providers.backend(base_url)
+    if cli:
+        results = _cli_languages(cli, model)
     else:
         with ThreadPoolExecutor(max_workers=3) as pool:
             results = list(pool.map(lambda language: check_translation(base_url, model, language, api_key), TARGET_LANGUAGES))
@@ -148,17 +150,17 @@ def available_languages(base_url, model, api_key=""):
     }
 
 
-_codex_probe_lock = threading.Lock()
+_cli_probe_lock = threading.Lock()
 
 
-def _codex_languages(model):
+def _cli_languages(cli, model):
     # A single structured response tests every language; each sentence is still
     # validated independently using the same rules as other providers.
-    with _codex_probe_lock:
-        if not codex_provider.available():
+    with _cli_probe_lock:
+        if not cli.available():
             return [{"success": False, "status": "unavailable", "target_lang": code,
-                     "message": "Sign in to Codex with ChatGPT using codex login in a terminal."} for code in PROBES]
-        keys = [(codex_provider.BASE_URL, model, code, hashlib.sha256(b"").hexdigest()) for code in PROBES]
+                     "message": "Sign in to the selected AI command-line tool in a terminal."} for code in PROBES]
+        keys = [(cli.BASE_URL, model, code, hashlib.sha256(b"").hexdigest()) for code in PROBES]
         with _lock:
             cached = [_cache.get(key) for key in keys]
             if all(row and row[0] > time.monotonic() for row in cached):
@@ -168,7 +170,7 @@ def _codex_languages(model):
         prompt = "Translate each cooking instruction into its specified language/script. Preserve 2 grams of salt, writing the amount as digit 2. Return one sentence per language code, without explanation:\n" + json.dumps(
             {code: {"language": language, "source": source} for code, (language, source) in PROBES.items()}, ensure_ascii=False)
         try:
-            replies = codex_provider.complete(prompt, model, schema)
+            replies = cli.complete(prompt, model, schema)
         except ValueError:
             replies = {}
         results = []
@@ -193,7 +195,7 @@ def clear_translation_cache():
 
 def verified_languages(base_url, model, api_key=""):
     """Read successful, unexpired samples without making model requests."""
-    if base_url == codex_provider.BASE_URL:
+    if cli_providers.backend(base_url):
         api_key = ""
     digest = hashlib.sha256(api_key.encode()).hexdigest()
     with _lock:

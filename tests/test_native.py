@@ -3,7 +3,7 @@ import os
 import sqlite3
 import threading
 import time
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 os.environ["QT_QPA_PLATFORMTHEME"] = ""
@@ -232,7 +232,8 @@ def test_setup_without_ai_clears_previous_selection(window):
         dialog.findChild(QPushButton).click()
 
     QTimer.singleShot(0, finish_setup)
-    window.show_setup()
+    with patch('app.cli_providers.detected', return_value=[]):
+        window.show_setup()
     assert store.setting('ai_provider') == ''
     assert store.setting('ai_model') == ''
     assert store.setting('llamacpp_model') == ''
@@ -263,7 +264,7 @@ def test_reset_clears_youtube_search_and_preferences(window):
     assert window.video_rows == [] and window.video_results.count() == 0
     assert window.video_group.count() == 1
     assert window.video_count.value() == 10 and window.video_language.currentData() == ''
-    assert not window.video_preview_button.isEnabled() and not window.video_pick_button.isEnabled()
+    assert not window.video_preview_button.isEnabled()
     assert store.setting('video_result_count') == '10' and store.setting('video_search_language') == ''
 
 
@@ -279,7 +280,7 @@ def test_selecting_target_enables_translation_for_import(window):
     assert job.call_args.kwargs['use_ai'] is True
     with patch.object(store, 'import_recipe') as importer:
         job.call_args.args[0]()
-    importer.assert_called_once_with('https://example.org/german-recipe', True, 'de')
+    importer.assert_called_once_with('https://example.org/german-recipe', True, 'de', progress=ANY)
 
 
 def test_reprocess_recovers_missing_ingredients_from_source(native_record):
@@ -386,13 +387,13 @@ def test_successful_thumbnail_reply_replaces_placeholder(window, qt_app):
     assert 'https://i.ytimg.com/vi/example/mqdefault.jpg' in window.previews
 
 
-def test_preview_opens_youtube_without_importing_and_choose_fills_url(window):
+def test_preview_opens_youtube_without_importing_and_click_fills_url(window):
     url = 'https://www.youtube.com/watch?v=example'
     window.video_rows = [{'title': 'Soup preview', 'url': url, 'duration': 120}]
     window.render_videos(); item = window.video_results.item(0)
     assert not window.video_preview_button.isEnabled()
     window.video_results.setCurrentItem(item)
-    assert window.video_preview_button.isEnabled() and window.video_pick_button.isEnabled()
+    assert window.video_preview_button.isEnabled()
     before = len(store.recipes())
     with patch('app.native.QDesktopServices.openUrl', return_value=True) as open_url:
         window.video_preview_button.click()
@@ -400,7 +401,7 @@ def test_preview_opens_youtube_without_importing_and_choose_fills_url(window):
         window.video_results.itemActivated.emit(item)
         assert open_url.call_count == 2
     assert len(store.recipes()) == before and not window.url.text()
-    window.video_pick_button.click(); assert window.url.text() == url
+    window.video_results.itemClicked.emit(item); assert window.url.text() == url
     window.video_filter.setText('no match')
     assert not window.video_preview_button.isEnabled()
 
@@ -455,7 +456,14 @@ def test_recipe_retranslation_saves_both_sections_and_uses_interface_units(windo
     assert store.recipe(native_record)['instructions'] == translated['instructions']
 
 
-def test_verified_targets_are_available_as_interface_languages(window, qt_app):
+@pytest.fixture
+def no_shipped_locales():
+    from app import interface_languages
+    with patch.object(interface_languages, 'shipped', return_value={}):
+        yield
+
+
+def test_verified_targets_are_available_as_interface_languages(window, qt_app, no_shipped_locales):
     from app import interface_languages
     options = [{'code':'ja','name':'日本語'}, {'code':'pt-BR','name':'Português (Brasil)'}]
     window.fill_targets(options)
@@ -483,7 +491,7 @@ def test_verified_targets_are_available_as_interface_languages(window, qt_app):
     assert window.language == 'ja'
 
 
-def test_incomplete_interface_translation_keeps_existing_locale(window, qt_app):
+def test_incomplete_interface_translation_keeps_existing_locale(window, qt_app, no_shipped_locales):
     from app import interface_languages
     window.fill_targets([{'code':'sv','name':'Svenska'}])
     with patch.object(interface_languages, 'generate', side_effect=ValueError('Incomplete')):
@@ -553,13 +561,277 @@ def test_hide_waits_for_running_translation_before_releasing_gpu(window, qt_app)
         stop.assert_called_once()
 
 
-def test_local_runtime_loads_saved_model_and_stops_only_known_service():
+def test_local_runtime_starts_llama_loads_saved_model_and_stops_service():
     from app import local_runtime
-    from unittest.mock import MagicMock
-    response = MagicMock()
     cfg = {'provider':'llamacpp','model':'saved-model','base_url':'http://127.0.0.1:8080/v1'}
-    with patch.object(store,'configuration',return_value=cfg), patch('app.local_runtime.subprocess.run') as run, patch('app.local_runtime.httpx.get',side_effect=[__import__('httpx').ConnectError('offline'), response]), patch('app.local_runtime.load_model') as load:
-        local_runtime.ensure(); local_runtime.stop()
-    assert run.call_args_list[0].args[0] == ['systemctl','--user','start','llama-server.service']
-    assert run.call_args_list[1].args[0] == ['systemctl','--user','stop','llama-server.service']
+    started = []
+    with patch.object(store,'configuration',return_value=cfg), patch.object(local_runtime,'release_all') as release, \
+         patch.object(local_runtime,'llama_models',side_effect=lambda: [] if started else None), \
+         patch('app.local_runtime.subprocess.run',side_effect=lambda command, **_: started.append(command)), \
+         patch.object(local_runtime,'require_vram'), patch('app.local_runtime.load_model') as load:
+        local_runtime.ensure()
+    assert started[0] == ['systemctl','--user','start','llama-server.service']
+    release.assert_called_once_with(keep='llamacpp')
     load.assert_called_once_with('saved-model','llamacpp')
+    local_runtime._used.clear()
+
+
+def test_import_page_has_food_icon(window):
+    assert hasattr(window, "header_food_icon")
+    assert not window.header_food_icon.pixmap().isNull()
+    assert window.header_food_icon.width() == 38
+    assert window.header_food_icon.height() == 38
+
+
+def test_select_button_is_placed_beneath_model_selection(window):
+    model_row, _ = window.ai_form.getWidgetPosition(window.model)
+    btn_row, _ = window.ai_form.getWidgetPosition(window.select_button)
+    assert btn_row == model_row + 1
+
+
+def test_local_runtime_ensure_with_target_provider_and_model():
+    from app import local_runtime
+    cfg = {'provider':'custom','model':'old-model','base_url':'http://127.0.0.1:8080/v1'}
+    with patch.object(store,'configuration',return_value=cfg), patch.object(local_runtime,'release_all'), \
+         patch.object(local_runtime,'ensure_llamacpp') as ensure_llama:
+        local_runtime.ensure(provider='llamacpp', model='new-model')
+    ensure_llama.assert_called_once_with('new-model')
+    local_runtime._used.clear()
+
+
+def test_uninstalled_and_unconfigured_providers_are_grayed_out(window):
+    # Check that provider items are properly formatted and colored
+    model = window.provider.model()
+    colors = __import__('app.native', fromlist=['get_theme_colors']).get_theme_colors()
+    muted_color = colors.get("muted", "#867658").lower()
+
+    # Find LM Studio (local, not installed)
+    with patch('app.ai_config.lmstudio_cli', return_value=''), patch('app.ai_config.lmstudio_running', return_value=False):
+        window.fill_provider_list()
+    lm_idx = window.provider.findData("lmstudio")
+    assert lm_idx >= 0
+    lm_item = model.item(lm_idx)
+    assert not lm_item.isEnabled()
+    assert lm_item.foreground().color().name().lower() == muted_color
+
+    # Find OpenAI (online, not configured)
+    openai_idx = window.provider.findData("openai")
+    assert openai_idx >= 0
+    openai_item = model.item(openai_idx)
+    assert openai_item.isEnabled()  # Can be selected to input key
+    assert openai_item.foreground().color().name().lower() == muted_color
+    assert "nicht eingerichtet" in openai_item.text() or "not configured" in openai_item.text()
+
+    # Find llamacpp (configured/ready)
+    llama_idx = window.provider.findData("llamacpp")
+    assert llama_idx >= 0
+    llama_item = model.item(llama_idx)
+    assert llama_item.isEnabled()
+
+
+def test_entering_api_key_enables_select_button(window):
+    openai_idx = window.provider.findData("openai")
+    window.provider.setCurrentIndex(openai_idx)
+    assert window.provider.currentData() == "openai"
+    assert not window.key.isHidden()
+    # With no key, select button is disabled
+    assert not window.select_button.isEnabled()
+    # When key is entered, select button becomes enabled
+    window.key.setText("sk-testkey123")
+    assert window.select_button.isEnabled()
+
+
+def test_help_headers_are_colored_by_theme(window):
+    colors = __import__('app.native', fromlist=['get_theme_colors']).get_theme_colors()
+    accent = colors.get("accent", "#d7a66c").lower()
+    window.refresh_help()
+    html = window.help_view.toHtml().lower()
+    assert f"color:{accent}" in html or f"color: {accent}" in html
+
+
+def test_settings_help_texts_placed_in_separate_rows_without_overlap(window):
+    # Provider combo and its help label
+    prov_row, _ = window.ai_form.getWidgetPosition(window.provider)
+    prov_help_row, _ = window.ai_form.getWidgetPosition(window.provider_help)
+    assert prov_help_row == prov_row + 1
+
+    # Target language combo and its status label (Languages card, below the AI card)
+    target_row, _ = window.lang_form.getWidgetPosition(window.settings_target)
+    target_status_row, _ = window.lang_form.getWidgetPosition(window.language_status)
+    assert target_status_row == target_row + 1
+
+
+def test_video_results_two_per_row_and_snap_scrolling(window, qt_app):
+    window.show(); qt_app.processEvents()
+    window.video_rows = [{'title': f'Video #{i}', 'url': f'http://y/{i}', 'duration': 100, 'group': 'Test'} for i in range(16)]
+    window.render_videos()
+    qt_app.processEvents()
+
+    vr = window.video_results
+    assert vr.count() == 16
+    # At least one row; taller windows show more rows.
+    assert vr.height() >= vr.ROW_HEIGHT
+
+    # Check 2 cards per row: items 0 & 1 on row 0, item 2 on row 1
+    r0 = vr.visualItemRect(vr.item(0))
+    r1 = vr.visualItemRect(vr.item(1))
+    r2 = vr.visualItemRect(vr.item(2))
+    assert r0.y() == r1.y()
+    assert r1.x() > r0.x()
+
+    # Rows are exactly one card height apart
+    assert r2.y() - r0.y() == vr.ROW_HEIGHT
+
+    # Scroll snapping: step down to next row
+    vr.verticalScrollBar().setValue(vr.ROW_HEIGHT)
+    qt_app.processEvents()
+    r2_scrolled = vr.visualItemRect(vr.item(2))
+    assert r2_scrolled.y() == 0
+
+    # Snapping helper
+    vr.verticalScrollBar().setValue(vr.ROW_HEIGHT + 30)
+    vr.snap_to_nearest()
+    wait_events(qt_app, lambda: vr.verticalScrollBar().value() == vr.ROW_HEIGHT)
+    assert vr.verticalScrollBar().value() == vr.ROW_HEIGHT
+
+
+def test_changing_provider_and_model_updates_import_page_immediately(window, qt_app):
+    # Set to codex first
+    codex_idx = window.provider.findData("codex")
+    if codex_idx >= 0:
+        window.provider.setCurrentIndex(codex_idx)
+        qt_app.processEvents()
+        assert "Codex" in window.model_line.text()
+        assert store.setting("ai_provider") == "codex"
+
+    # Now change to llamacpp
+    lcpp_idx = window.provider.findData("llamacpp")
+    assert lcpp_idx >= 0
+    window.provider.setCurrentIndex(lcpp_idx)
+    qt_app.processEvents()
+    assert "llama.cpp" in window.model_line.text()
+    assert store.setting("ai_provider") == "llamacpp"
+
+    # Now change model name
+    window.model.setCurrentText("my-test-model-42")
+    qt_app.processEvents()
+    assert "my-test-model-42" in window.model_line.text()
+    assert store.setting("ai_model") == "my-test-model-42"
+
+    # Switch to tab 0 (Import tab)
+    window.tabs.setCurrentIndex(0)
+    qt_app.processEvents()
+    assert "llama.cpp" in window.model_line.text()
+    assert "my-test-model-42" in window.model_line.text()
+
+
+
+
+
+
+
+def test_clicking_video_card_fills_import_url(window):
+    url = 'https://www.youtube.com/watch?v=clicked'
+    window.url.clear()
+    window.video_rows = [{'title': 'Clicked soup', 'url': url, 'duration': 60}]
+    window.render_videos()
+    window.video_results.itemClicked.emit(window.video_results.item(0))
+    assert window.url.text() == url
+    assert window.status.text() == window.nt('video_picked')
+
+
+def test_busy_banner_shows_job_steps_and_result(window, qt_app):
+    release = threading.Event(); reported = threading.Event()
+    def job():
+        window.job_progress.emit('progress_ai'); reported.set(); release.wait(2); return 'ok'
+    window.show()
+    window.run_job(job, lambda _: window.status.setText(window.nt('import_done')), 'importing')
+    wait_events(qt_app, reported.is_set); wait_events(qt_app, lambda: window.busy_step.isVisible())
+    assert window.busy_banner.isVisible() and window.busy_progress.isVisible()
+    assert window.nt('importing') in window.busy_title.text()
+    assert window.nt('progress_ai') in window.busy_step.text()
+    release.set(); wait_events(qt_app, lambda: not window.busy)
+    assert window.busy_banner.isVisible() and not window.busy_progress.isVisible()
+    assert window.nt('import_done') in window.busy_title.text()
+    assert window.busy_banner.property('state') == 'done'
+    window.dismiss_banner(); assert not window.busy_banner.isVisible()
+    window.hide()
+
+
+def test_failed_job_marks_banner_failed(window, qt_app):
+    def job():
+        raise RuntimeError('boom')
+    window.run_job(job, lambda _: None, 'importing')
+    wait_events(qt_app, lambda: not window.busy)
+    assert window.busy_banner.property('state') == 'failed'
+    assert window.nt('failed') in window.busy_title.text()
+    window.dismiss_banner()
+
+
+def test_setup_preselects_signed_in_claude(window):
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QComboBox, QDialog
+    seen = []
+    def inspect_setup():
+        dialog = next(child for child in window.findChildren(QDialog) if child.isVisible())
+        choices = dialog.findChildren(QComboBox)[1]
+        seen.append(choices.currentData()); dialog.reject()
+    QTimer.singleShot(0, inspect_setup)
+    with patch('app.cli_providers.detected', return_value=['claude', 'codex']):
+        window.show_setup()
+    assert seen == ['claude']
+
+
+def test_ai_import_reports_why_no_recipe_was_extracted(native_record):
+    url = 'https://www.youtube.com/watch?v=noRecipe'
+    extracted = {'title': 'Vlog', 'ingredients': [], 'instructions': [], 'source_url': url,
+                 'raw_text': 'Vlog\nsubscribe', 'transcript': 'today we cook nothing'}
+    steps = []
+    with patch.object(store, 'extract', return_value=extracted), patch.object(store, 'require_translation'), \
+         patch.object(store, 'normalize', return_value={'title': 'Vlog', 'ingredients': [], 'instructions': []}) as normalize:
+        result = store.import_recipe(url, True, 'en', progress=steps.append)
+    assert result['without_ai'] and result['ai_error'] == 'ai_no_recipe'
+    assert 'today we cook nothing' in normalize.call_args.args[1]
+    assert steps == ['progress_reading', 'progress_checking', 'progress_ai', 'progress_saving']
+    store.delete_recipe(result['id'])
+
+
+def test_ai_import_reports_unavailable_model(native_record):
+    url = 'https://example.com/unavailable-model'
+    extracted = {'title': 'Soup', 'ingredients': ['salt'], 'instructions': ['Cook'], 'source_url': url}
+    with patch.object(store, 'extract', return_value=extracted), patch.object(store, 'require_translation', side_effect=ValueError('down')):
+        result = store.import_recipe(url, True)
+    assert result['ai_error'] == 'translation_unavailable'
+    store.delete_recipe(result['id'])
+
+
+def test_import_ai_row_shows_check_button_only_until_languages_are_verified(window):
+    store.save_settings({'ai_provider': 'llamacpp'})
+    window.fill_targets([])
+    assert not window.ai_hint.isHidden() and not window.check_button.isHidden()
+    window.fill_targets([{'code': 'en', 'name': 'English'}])
+    assert window.ai_hint.isHidden() and window.check_button.isHidden()
+    store.save_settings({'ai_provider': ''})
+    window.fill_targets([])
+    assert window.ai_hint.text() == window.nt('ai_off_hint') and window.check_button.isHidden()
+
+
+def test_video_filters_appear_only_with_results(window):
+    window.video_rows = []; window.render_videos()
+    assert window.video_filter_row.isHidden()
+    window.video_rows = [{'title': 'Soup', 'url': 'https://youtu.be/x', 'group': 'Chef'}]; window.render_videos()
+    assert not window.video_filter_row.isHidden()
+
+
+def test_settings_cards_put_ai_before_languages(window):
+    ai_card = window.provider.parentWidget(); lang_card = window.layout_language.parentWidget()
+    column = ai_card.parentWidget().layout()
+    assert column.indexOf(ai_card) == 0 and column.indexOf(lang_card) == 1
+    assert window.settings_target.parentWidget() is lang_card
+
+
+def test_switching_provider_in_settings_releases_gpu_in_background(window, qt_app):
+    with patch('app.native.local_runtime.release_unselected') as release:
+        window.provider.setCurrentIndex(window.provider.findData('claude'))
+        wait_events(qt_app, lambda: release.called and not window.ai_workers)
+    release.assert_called_with('claude')

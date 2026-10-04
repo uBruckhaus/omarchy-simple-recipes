@@ -94,6 +94,13 @@ TRANSLATIONS = {
         "offline": "offline",
         "active_online": "active (Online API)",
         "model_active": "active",
+        "provider_ready": "ready",
+        "provider_not_installed": "not installed",
+        "provider_not_configured": "not configured",
+        "provider_not_logged_in": "not signed in",
+        "provider_not_installed_tip": "This local provider is not installed or running.",
+        "provider_not_configured_tip": "API key required. Select to enter your key.",
+        "provider_not_logged_in_tip": "Run 'codex login' in a terminal to authenticate.",
         
         # Toolbar & Filters
         "recipes_count": "recipes",
@@ -160,7 +167,7 @@ TRANSLATIONS = {
         "lang_eyebrow": "LOCALIZATION",
         "lang_heading": "🌐 Language & Translation",
         "lang_desc": "Set your layout language and the target translation language for recipe imports.",
-        "lang_layout_label": "Layout Language (UI)",
+        "lang_layout_label": "Interface language",
         "lang_recipe_label": "Recipe Target Language",
         "lang_save_btn": "Save Language Settings",
         
@@ -224,6 +231,13 @@ TRANSLATIONS = {
         "offline": "offline",
         "active_online": "aktiv (Online API)",
         "model_active": "aktiv",
+        "provider_ready": "bereit",
+        "provider_not_installed": "nicht installiert",
+        "provider_not_configured": "nicht eingerichtet",
+        "provider_not_logged_in": "nicht angemeldet",
+        "provider_not_installed_tip": "Dieser lokale Provider ist nicht installiert oder läuft nicht.",
+        "provider_not_configured_tip": "API-Schlüssel erforderlich. Auswählen, um Schlüssel einzugeben.",
+        "provider_not_logged_in_tip": "Führe 'codex login' im Terminal aus, um dich anzumelden.",
         
         # Toolbar & Filters
         "recipes_count": "Rezepte",
